@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CarbonWise - Eco Footprint Awareness & Actions</title>
+    <meta name="description" content="Track your carbon footprint using Google Routes and Firestore. Get personalized recommendations and log daily eco-friendly actions.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+    <div class="appearance-dropdown-container">
+        <button id="appearance-toggle-btn" class="btn appearance-toggle-btn" aria-haspopup="true" aria-expanded="false" aria-controls="appearance-dropdown">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span>Appearance</span>
+        </button>
+        <div id="appearance-dropdown" class="appearance-dropdown-menu" hidden aria-hidden="true">
+            <div class="appearance-settings">
+                <!-- Theme Selection -->
+                <div class="setting-row">
+                    <span class="setting-label" id="theme-label">Base Theme</span>
+                    <div class="theme-options" role="radiogroup" aria-labelledby="theme-label">
+                        <button class="theme-btn" data-theme="dark" role="radio" aria-checked="false" aria-label="Dark Theme">
+                            <span class="theme-preview theme-preview-dark"></span>
+                            Dark
+                        </button>
+                        <button class="theme-btn" data-theme="light" role="radio" aria-checked="false" aria-label="Light Theme">
+                            <span class="theme-preview theme-preview-light"></span>
+                            Light
+                        </button>
+                        <button class="theme-btn" data-theme="glass" role="radio" aria-checked="false" aria-label="Cyber Glass Theme">
+                            <span class="theme-preview theme-preview-glass"></span>
+                            Glass
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Accent Color -->
+                <div class="setting-row">
+                    <span class="setting-label" id="accent-label">Accent Color</span>
+                    <div class="accent-options" role="radiogroup" aria-labelledby="accent-label">
+                        <button class="accent-dot" data-accent="#10b981" style="background-color: #10b981;" role="radio" aria-checked="false" aria-label="Emerald Green Accent" title="Emerald"></button>
+                        <button class="accent-dot" data-accent="#0ea5e9" style="background-color: #0ea5e9;" role="radio" aria-checked="false" aria-label="Ocean Blue Accent" title="Ocean Blue"></button>
+                        <button class="accent-dot" data-accent="#f59e0b" style="background-color: #f59e0b;" role="radio" aria-checked="false" aria-label="Sunset Amber Accent" title="Sunset Amber"></button>
+                        <button class="accent-dot" data-accent="#a855f7" style="background-color: #a855f7;" role="radio" aria-checked="false" aria-label="Royal Purple Accent" title="Royal Purple"></button>
+                        <button class="accent-dot" data-accent="#f43f5e" style="background-color: #f43f5e;" role="radio" aria-checked="false" aria-label="Rose Red Accent" title="Rose"></button>
+                        <span class="accent-name" id="accent-name-display">Emerald</span>
+                    </div>
+                </div>
+
+                <!-- Font Size -->
+                <div class="setting-row">
+                    <span class="setting-label" id="fontsize-label">Font Size</span>
+                    <div class="fontsize-row" role="group" aria-labelledby="fontsize-label">
+                        <button class="fontsize-btn" data-size="small" aria-label="Small font size">A<sub>s</sub></button>
+                        <button class="fontsize-btn" data-size="medium" aria-label="Medium font size">A</button>
+                        <button class="fontsize-btn" data-size="large" aria-label="Large font size">A<sup>+</sup></button>
+                        <span class="fontsize-preview" id="fontsize-preview-text">Aa</span>
+                    </div>
+                </div>
+
+                <!-- Compact Mode Toggle -->
+                <div class="setting-row setting-row-inline">
+                    <span class="setting-label">Compact Mode</span>
+                    <label class="toggle-switch" for="compact-toggle" aria-label="Toggle compact mode">
+                        <input type="checkbox" id="compact-toggle" role="switch">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+    <header class="app-header" role="banner">
+        <div class="header-container">
+            <div class="logo-area">
+                <div class="logo-icon" aria-hidden="true">
+                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="16" cy="16" r="14" fill="currentColor" opacity="0.14"/>
+                        <path d="M23.5 7.5C17 7.9 12.2 10 9.9 13.8C7.9 17.1 9.1 20.7 12.5 22C17.4 23.8 22.3 18.7 23.5 7.5Z" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M9 24C12.3 18.3 16.1 14.9 21.4 12.6" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <h1>CarbonWise</h1>
+            </div>
+            <p class="tagline">Personalized Insights for a Sustainable Future</p>
+        </div>
+    </header>
+
+    <main class="dashboard-grid" role="main" id="main-content">
+        <!-- Dashboard Summary & KPI Metrics -->
+        <section class="card summary-card" aria-labelledby="summary-heading">
+            <h2 id="summary-heading">Your Daily Footprint</h2>
+            <div class="kpi-container">
+                <div class="progress-ring-wrapper">
+                    <!-- Circular Progress bar SVG -->
+                    <svg class="progress-ring" width="160" height="160" aria-hidden="true">
+                        <circle class="progress-ring__background" stroke="rgba(255,255,255,0.05)" stroke-width="12" fill="transparent" r="70" cx="80" cy="80" />
+                        <circle class="progress-ring__circle" id="total-co2-ring" stroke="url(#emerald-gradient)" stroke-width="12" stroke-dasharray="439.82" stroke-dashoffset="439.82" fill="transparent" r="70" cx="80" cy="80" />
+                        <defs>
+                            <linearGradient id="emerald-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#10b981" />
+                                <stop offset="100%" stop-color="#059669" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <div class="progress-ring-text">
+                        <span class="co2-value" id="total-co2-value">0.0</span>
+                        <span class="co2-unit">kg CO₂e</span>
+                    </div>
+                </div>
+                
+                <div class="metrics-breakdown" aria-label="Footprint Breakdown by Category">
+                    <div class="metric-item" data-category="energy">
+                        <div class="metric-info">
+                            <span class="label">Household Energy</span>
+                            <span class="value" id="energy-co2">0.0 kg</span>
+                        </div>
+                        <div class="progress-bar-bg"><div class="progress-bar-fill" id="energy-bar" style="width: 0%"></div></div>
+                    </div>
+                    <div class="metric-item" data-category="transport">
+                        <div class="metric-info">
+                            <span class="label">Transportation</span>
+                            <span class="value" id="transport-co2">0.0 kg</span>
+                        </div>
+                        <div class="progress-bar-bg"><div class="progress-bar-fill" id="transport-bar" style="width: 0%"></div></div>
+                    </div>
+                    <div class="metric-item" data-category="diet">
+                        <div class="metric-info">
+                            <span class="label">Diet & Nutrition</span>
+                            <span class="value" id="diet-co2">0.0 kg</span>
+                        </div>
+                        <div class="progress-bar-bg"><div class="progress-bar-fill" id="diet-bar" style="width: 0%"></div></div>
+                    </div>
+                    <div class="metric-item" data-category="waste">
+                        <div class="metric-info">
+                            <span class="label">Waste & Materials</span>
+                            <span class="value" id="waste-co2">0.0 kg</span>
+                        </div>
+                        <div class="progress-bar-bg"><div class="progress-bar-fill" id="waste-bar" style="width: 0%"></div></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="target-comparison" id="target-assessment">
+                <p>Loading assessment...</p>
+            </div>
+        </section>
+
+
+
+
+
+        <!-- Log Daily Footprint Form -->
+        <section class="card tracking-card" aria-labelledby="tracker-heading">
+            <h2 id="tracker-heading">Log Your Footprint</h2>
+            
+            <div class="tab-list" role="tablist" aria-label="Logging categories">
+                <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="energy-panel" id="tab-energy">Energy</button>
+                <button class="tab-btn" role="tab" aria-selected="false" aria-controls="transport-panel" id="tab-transport">Transport</button>
+                <button class="tab-btn" role="tab" aria-selected="false" aria-controls="diet-panel" id="tab-diet">Diet</button>
+                <button class="tab-btn" role="tab" aria-selected="false" aria-controls="waste-panel" id="tab-waste">Waste</button>
+            </div>
+
+            <form id="footprint-form" class="tracker-form">
+                <!-- Energy Panel -->
+                <div class="tab-panel active" id="energy-panel" role="tabpanel" aria-labelledby="tab-energy" tabindex="0">
+                    <div class="form-group">
+                        <label for="electricity">Electricity Usage (kWh)</label>
+                        <input type="number" id="electricity" name="electricity_kwh" min="0" step="any" value="5.0" placeholder="e.g. 10.5">
+                        <span class="field-desc">Grid energy used by your household today.</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="gas">Natural Gas (m³)</label>
+                        <input type="number" id="gas" name="gas_m3" min="0" step="any" value="0.0" placeholder="e.g. 1.2">
+                        <span class="field-desc">Heating or cooking gas usage.</span>
+                    </div>
+                </div>
+
+                <!-- Transport Panel -->
+                <div class="tab-panel" id="transport-panel" role="tabpanel" aria-labelledby="tab-transport" tabindex="0" hidden>
+                    <div class="form-group">
+                        <label for="transport-mode">Transportation Mode</label>
+                        <select id="transport-mode" name="mode">
+                            <option value="car">Car (Personal)</option>
+                            <option value="bus">Public Bus</option>
+                            <option value="train">Train / Metro</option>
+                            <option value="motorcycle">Motorcycle</option>
+                            <option value="bicycle">Bicycle (0 emissions)</option>
+                            <option value="walk">Walking (0 emissions)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group" id="vehicle-type-group">
+                        <label for="vehicle-type">Vehicle Fuel Type</label>
+                        <select id="vehicle-type" name="vehicle_type">
+                            <option value="petrol">Petrol (Standard)</option>
+                            <option value="diesel">Diesel</option>
+                            <option value="hybrid">Hybrid</option>
+                            <option value="electric">Electric Vehicle (EV)</option>
+                        </select>
+                    </div>
+
+                    <div class="route-calculator-box">
+                        <h3>Google Routes Distance Estimator</h3>
+                        <div class="route-inputs">
+                            <div class="form-group">
+                                <label for="route-origin">Origin</label>
+                                <input type="text" id="route-origin" placeholder="City or Full Address">
+                            </div>
+                            <div class="form-group">
+                                <label for="route-dest">Destination</label>
+                                <input type="text" id="route-dest" placeholder="City or Full Address">
+                            </div>
+                        </div>
+                        <button type="button" class="btn secondary-btn" id="calc-route-btn">Estimate Distance</button>
+                        <div id="route-result" class="route-feedback" aria-live="polite"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="distance-label-row">
+                            <label for="distance" id="distance-input-label">Distance Traveled (miles)</label>
+                            <div class="unit-selector-wrapper">
+                                <label for="distance-unit" class="sr-only">Distance Unit</label>
+                                <select id="distance-unit" class="unit-select">
+                                    <option value="miles" selected>mi</option>
+                                    <option value="km">km</option>
+                                </select>
+                            </div>
+                        </div>
+                        <input type="number" id="distance" name="distance" min="0" step="any" value="10.0">
+                        <span class="field-desc">Manual distance override or calculated Google Maps route distance.</span>
+                    </div>
+                </div>
+
+                <!-- Diet Panel -->
+                <div class="tab-panel" id="diet-panel" role="tabpanel" aria-labelledby="tab-diet" tabindex="0" hidden>
+                    <div class="form-group">
+                        <label for="diet-type">Diet Profile</label>
+                        <select id="diet-type" name="diet_type">
+                            <option value="vegan">Vegan (Completely Plant-Based)</option>
+                            <option value="vegetarian">Vegetarian (No meat, contains dairy/eggs)</option>
+                            <option value="no_beef">No Beef (Poultry & Fish only)</option>
+                            <option value="average" selected>Average (Moderate Meat & Poultry)</option>
+                            <option value="heavy_meat">Heavy Meat Lover (High beef/lamb consumption)</option>
+                        </select>
+                        <span class="field-desc">Diet choices highly influence daily carbon footprints.</span>
+                    </div>
+                </div>
+
+                <!-- Waste Panel -->
+                <div class="tab-panel" id="waste-panel" role="tabpanel" aria-labelledby="tab-waste" tabindex="0" hidden>
+                    <div class="form-group">
+                        <label for="waste-kg">Daily Trash Output (kg)</label>
+                        <input type="number" id="waste-kg" name="waste_kg" min="0" step="any" value="1.5">
+                        <span class="field-desc">Approximate weight of non-reusable waste thrown away today.</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="recycling-rate">Recycling Rate (%)</label>
+                        <input type="number" id="recycling-rate" name="waste_recycling_rate" min="0" max="100" step="any" value="30">
+                        <span class="field-desc">Percentage of today's waste sorted for recycling or composting.</span>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn primary-btn" id="submit-log-btn">Submit Daily Log</button>
+                    <button type="button" class="btn secondary-btn" id="reset-form-btn">Reset Form</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Recommendations Section -->
+        <section class="card recommendations-card" aria-labelledby="recs-heading">
+            <h2 id="recs-heading">Personalized Insights</h2>
+            <div class="recommendations-list" id="recommendations-container" aria-live="polite">
+                <p class="empty-msg">Log your metrics to generate personalized recommendations.</p>
+            </div>
+        </section>
+
+        <!-- Actions & History Section -->
+        <section class="card history-card" aria-labelledby="history-heading">
+            <h2 id="history-heading">Green Habits Tracker & Logs</h2>
+            
+            <div class="green-actions-box">
+                <h3>Log An Offset Action</h3>
+                <div class="action-buttons-grid">
+                    <button class="action-btn" data-action="public_transit" data-offset="1.8">
+                        <span class="icon">
+                            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                                <rect x="4" y="2" width="16" height="16" rx="2" ry="2"></rect>
+                                <line x1="4" y1="14" x2="20" y2="14"></line>
+                                <line x1="8" y1="6" x2="16" y2="6"></line>
+                                <line x1="6" y1="18" x2="6" y2="21"></line>
+                                <line x1="18" y1="18" x2="18" y2="21"></line>
+                                <circle cx="8" cy="10" r="1"></circle>
+                                <circle cx="16" cy="10" r="1"></circle>
+                            </svg>
+                        </span>
+                        <span class="title">Took Public Transit</span>
+                        <span class="saving">-1.8 kg CO₂</span>
+                    </button>
+                    <button class="action-btn" data-action="meatless_meal" data-offset="1.2">
+                        <span class="icon">
+                            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                                <path d="M2 22c1.25-6.7 5.85-11.3 12.5-12.5C20.2 8.3 22 2 22 2s-6.3 1.8-12.5 7.5C3.8 15.1.7 20.75 2 22z"></path>
+                                <path d="M9 13l3 3M12 10l3 3"></path>
+                            </svg>
+                        </span>
+                        <span class="title">Meatless Meal</span>
+                        <span class="saving">-1.2 kg CO₂</span>
+                    </button>
+                    <button class="action-btn" data-action="led_lights" data-offset="0.5">
+                        <span class="icon">
+                            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                                <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .5 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"></path>
+                                <line x1="9" y1="18" x2="15" y2="18"></line>
+                                <line x1="10" y1="22" x2="14" y2="22"></line>
+                            </svg>
+                        </span>
+                        <span class="title">Installed LED Bulbs</span>
+                        <span class="saving">-0.5 kg CO₂</span>
+                    </button>
+                    <button class="action-btn" data-action="recycle_plastic" data-offset="0.3">
+                        <span class="icon">
+                            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                                <polyline points="17 1 21 5 17 9"></polyline>
+                                <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+                                <polyline points="7 23 3 19 7 15"></polyline>
+                                <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+                            </svg>
+                        </span>
+                        <span class="title">Diverted Waste</span>
+                        <span class="saving">-0.3 kg CO₂</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="logs-history-box">
+                <h3>Calculation History</h3>
+                <div class="table-wrapper">
+                    <table class="history-table" id="history-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Date/Time</th>
+                                <th scope="col">Total Footprint</th>
+                                <th scope="col">Energy</th>
+                                <th scope="col">Transport</th>
+                                <th scope="col">Diet</th>
+                                <th scope="col">Waste</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-tbody">
+                            <tr>
+                                <td colspan="6" class="empty-table">No calculation history available. Log a footprint to populate.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Invisible Accessibility Live region to announce updates to screen readers -->
+    <div id="aria-announcement" class="sr-only" aria-live="assertive"></div>
+
+    <footer class="app-footer" role="contentinfo">
+        <p>&copy; 2026 CarbonWise. Securely hosted via Google Cloud Solutions.</p>
+    </footer>
+
+    <!-- Frontend interactivity Logic -->
+    <script>
+        // State variables
+        const USER_ID = "demo_user_123";
+        let latestCalculations = null;
+        let isFetchingRoute = false;
+
+        // Dom Elements
+        const form = document.getElementById("footprint-form");
+        const tabBtns = document.querySelectorAll(".tab-btn");
+        const tabPanels = document.querySelectorAll(".tab-panel");
+        const transportModeSelect = document.getElementById("transport-mode");
+        const vehicleTypeGroup = document.getElementById("vehicle-type-group");
+        const calcRouteBtn = document.getElementById("calc-route-btn");
+        const routeOriginInput = document.getElementById("route-origin");
+        const routeDestInput = document.getElementById("route-dest");
+        const routeResultDiv = document.getElementById("route-result");
+        const distanceInput = document.getElementById("distance");
+        const distanceUnitSelect = document.getElementById("distance-unit");
+        const distanceInputLabel = document.getElementById("distance-input-label");
+
+        // Distance Unit Switch handler (miles <-> km)
+        if (distanceUnitSelect) {
+            distanceUnitSelect.addEventListener("change", () => {
+                const unit = distanceUnitSelect.value;
+                const distanceVal = parseFloat(distanceInput.value) || 0;
+                
+                if (unit === "km") {
+                    distanceInputLabel.textContent = "Distance Traveled (km)";
+                    // Convert miles to km
+                    distanceInput.value = (distanceVal * 1.60934).toFixed(1);
+                } else {
+                    distanceInputLabel.textContent = "Distance Traveled (miles)";
+                    // Convert km to miles
+                    distanceInput.value = (distanceVal * 0.621371).toFixed(1);
+                }
+            });
+        }
+        
+        // Metrics DOM
+        const totalCo2Value = document.getElementById("total-co2-value");
+        const totalCo2Ring = document.getElementById("total-co2-ring");
+        const energyCo2Val = document.getElementById("energy-co2");
+        const transportCo2Val = document.getElementById("transport-co2");
+        const dietCo2Val = document.getElementById("diet-co2");
+        const wasteCo2Val = document.getElementById("waste-co2");
+        
+        // Progress fills
+        const energyBar = document.getElementById("energy-bar");
+        const transportBar = document.getElementById("transport-bar");
+        const dietBar = document.getElementById("diet-bar");
+        const wasteBar = document.getElementById("waste-bar");
+        
+        const targetAssessment = document.getElementById("target-assessment");
+        const recommendationsContainer = document.getElementById("recommendations-container");
+        const historyTbody = document.getElementById("history-tbody");
+        const ariaAnnounce = document.getElementById("aria-announcement");
+
+        // Set active tabs
+        tabBtns.forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.preventDefault();
+                tabBtns.forEach(b => {
+                    b.classList.remove("active");
+                    b.setAttribute("aria-selected", "false");
+                });
+                tabPanels.forEach(p => {
+                    p.classList.remove("active");
+                    p.setAttribute("hidden", "true");
+                });
+
+                btn.classList.add("active");
+                btn.setAttribute("aria-selected", "true");
+                const targetId = btn.getAttribute("aria-controls");
+                const targetPanel = document.getElementById(targetId);
+                targetPanel.classList.add("active");
+                targetPanel.removeAttribute("hidden");
+                targetPanel.focus();
+            });
+        });
+
+        // Hide vehicle type selector if transportation mode is not personal car
+        transportModeSelect.addEventListener("change", () => {
+            const mode = transportModeSelect.value;
+            if (mode === "car" || mode === "motorcycle") {
+                vehicleTypeGroup.style.display = "block";
+                vehicleTypeGroup.removeAttribute("aria-hidden");
+            } else {
+                vehicleTypeGroup.style.display = "none";
+                vehicleTypeGroup.setAttribute("aria-hidden", "true");
+            }
+        });
+
+        // Google Routes API integration through FastAPI backend
+        calcRouteBtn.addEventListener("click", async () => {
+            const origin = routeOriginInput.value.trim();
+            const destination = routeDestInput.value.trim();
+            const mode = transportModeSelect.value;
+            
+            if (!origin || !destination) {
+                routeResultDiv.className = "route-feedback error";
+                routeResultDiv.textContent = "Please provide both Origin and Destination addresses.";
+                announceToScreenReader("Please provide both Origin and Destination addresses.");
+                return;
+            }
+
+            try {
+                isFetchingRoute = true;
+                calcRouteBtn.disabled = true;
+                calcRouteBtn.textContent = "Calculating route...";
+                routeResultDiv.className = "route-feedback info";
+                routeResultDiv.textContent = "Connecting to Google Routes API...";
+                announceToScreenReader("Connecting to Google Routes API to calculate distance.");
+
+                const response = await fetch("/api/route", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ origin, destination, travel_mode: mode })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    const miles = data.distance_miles;
+                    const unit = distanceUnitSelect ? distanceUnitSelect.value : "miles";
+                    
+                    if (unit === "km") {
+                        const km = parseFloat((miles * 1.60934).toFixed(2));
+                        distanceInput.value = km;
+                        routeResultDiv.className = "route-feedback success";
+                        routeResultDiv.textContent = `Route estimated! Distance: ${km} km. Source: ${data.source.replace(/_/g, ' ')}.`;
+                        announceToScreenReader(`Route estimated successfully. Calculated distance is ${km} kilometers.`);
+                    } else {
+                        distanceInput.value = miles;
+                        routeResultDiv.className = "route-feedback success";
+                        routeResultDiv.textContent = `Route estimated! Distance: ${miles} miles. Source: ${data.source.replace(/_/g, ' ')}.`;
+                        announceToScreenReader(`Route estimated successfully. Calculated distance is ${miles} miles.`);
+                    }
+                    
+                    // Dispatch change event to trigger re-calculations if needed
+                    distanceInput.dispatchEvent(new Event("change"));
+                } else {
+                    throw new Error(data.detail || "Failed to calculate route");
+                }
+            } catch (err) {
+                logger.error("Route calculation error", err);
+                routeResultDiv.className = "route-feedback error";
+                routeResultDiv.textContent = `Error: ${err.message}. Falling back to default values.`;
+                announceToScreenReader(`Route calculation failed. ${err.message}.`);
+            } finally {
+                isFetchingRoute = false;
+                calcRouteBtn.disabled = false;
+                calcRouteBtn.textContent = "Estimate Distance";
+            }
+        });
+
+        // Form Submission to log carbon footprint
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            
+            // Gather input fields
+            const rawDistance = parseFloat(distanceInput.value) || 0;
+            const unit = distanceUnitSelect ? distanceUnitSelect.value : "miles";
+            const distanceInMiles = unit === "km" ? rawDistance * 0.621371 : rawDistance;
+
+            const data = {
+                user_id: USER_ID,
+                electricity_kwh: parseFloat(document.getElementById("electricity").value) || 0,
+                gas_m3: parseFloat(document.getElementById("gas").value) || 0,
+                transport: [
+                    {
+                        distance: distanceInMiles,
+                        mode: transportModeSelect.value,
+                        vehicle_type: vehicleTypeGroup.style.display !== "none" ? document.getElementById("vehicle-type").value : null
+                    }
+                ],
+                diet_type: document.getElementById("diet-type").value,
+                diet_days: 1, // log single day
+                waste_kg: parseFloat(document.getElementById("waste-kg").value) || 0,
+                waste_recycling_rate: (parseFloat(document.getElementById("recycling-rate").value) || 0) / 100
+            };
+
+            try {
+                const response = await fetch("/api/calculate", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) {
+                    const errorDetails = await response.json();
+                    throw new Error(errorDetails.detail || "Calculation failed");
+                }
+
+                const result = await response.json();
+                latestCalculations = result.calculations;
+                
+                // Update UI KPI values
+                updateKPIs(latestCalculations);
+                
+                // Reload dashboard state
+                await fetchDashboardState();
+                
+                announceToScreenReader(`Successfully logged daily footprint. Total today is ${latestCalculations.total_co2} kg CO2.`);
+            } catch (err) {
+                alert(`Error saving log: ${err.message}`);
+            }
+        });
+
+        // Form Reset handler
+        const resetBtn = document.getElementById("reset-form-btn");
+        if (resetBtn) {
+            resetBtn.addEventListener("click", () => {
+                // Reset standard inputs
+                document.getElementById("electricity").value = "5.0";
+                document.getElementById("gas").value = "0.0";
+                document.getElementById("transport-mode").value = "car";
+                document.getElementById("transport-mode").dispatchEvent(new Event("change"));
+                document.getElementById("vehicle-type").value = "petrol";
+                
+                // Clear route estimator inputs and results
+                document.getElementById("route-origin").value = "";
+                document.getElementById("route-dest").value = "";
+                const routeResult = document.getElementById("route-result");
+                routeResult.className = "route-feedback";
+                routeResult.textContent = "";
+                routeResult.style.display = "none";
+                
+                // Reset distance based on active unit
+                const unit = distanceUnitSelect ? distanceUnitSelect.value : "miles";
+                document.getElementById("distance").value = unit === "km" ? "16.1" : "10.0";
+                
+                // Reset diet type
+                document.getElementById("diet-type").value = "average";
+                
+                // Reset waste
+                document.getElementById("waste-kg").value = "1.5";
+                document.getElementById("recycling-rate").value = "30";
+                
+                // Switch back to first tab (Energy)
+                const firstTab = document.getElementById("tab-energy");
+                if (firstTab) {
+                    firstTab.click();
+                }
+                
+                announceToScreenReader("Form inputs have been reset to defaults.");
+            });
+        }
+
+        // Action Buttons Logging
+        document.querySelectorAll(".action-btn").forEach(btn => {
+            btn.addEventListener("click", async () => {
+                const action = btn.getAttribute("data-action");
+                const offset = parseFloat(btn.getAttribute("data-offset"));
+                const title = btn.querySelector(".title").textContent;
+
+                try {
+                    const response = await fetch("/api/action", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            user_id: USER_ID,
+                            action: action,
+                            title: title,
+                            carbon_offset_kg: offset,
+                            timestamp: new Date().toISOString()
+                        })
+                    });
+
+                    if (response.ok) {
+                        announceToScreenReader(`Logged green habit: ${title}. Offset of ${offset} kg CO2 credited.`);
+                        await fetchDashboardState();
+                    } else {
+                        throw new Error("Unable to log green action.");
+                    }
+                } catch (err) {
+                    alert(`Error logging action: ${err.message}`);
+                }
+            });
+        });
+
+        // Helper to update progress ring & KPI details
+        function updateKPIs(calc) {
+            const total = calc.total_co2;
+            totalCo2Value.textContent = total.toFixed(1);
+            
+            // Limit scale to 30kg for the dashboard ring
+            const maxVal = 25.0;
+            const percentage = Math.min((total / maxVal), 1.0);
+            
+            // Circumference of radius 70 is 2 * pi * 70 = 439.82
+            const offset = 439.82 - (percentage * 439.82);
+            totalCo2Ring.style.strokeDashoffset = offset;
+
+            // Set color state based on emissions levels
+            if (total > 15) {
+                totalCo2Ring.style.stroke = "#ef4444"; // red
+            } else if (total > 8) {
+                totalCo2Ring.style.stroke = "#f59e0b"; // yellow
+            } else {
+                totalCo2Ring.style.stroke = "url(#emerald-gradient)"; // emerald
+            }
+
+            // Update category texts
+            energyCo2Val.textContent = `${calc.electricity_co2 + calc.gas_co2} kg`;
+            transportCo2Val.textContent = `${calc.transport_co2} kg`;
+            dietCo2Val.textContent = `${calc.diet_co2} kg`;
+            wasteCo2Val.textContent = `${calc.waste_co2} kg`;
+
+            // Update sub-category progress bars
+            energyBar.style.width = `${Math.min((calc.electricity_co2 + calc.gas_co2) / 6 * 100, 100)}%`;
+            transportBar.style.width = `${Math.min(calc.transport_co2 / 6 * 100, 100)}%`;
+            dietBar.style.width = `${Math.min(calc.diet_co2 / 10 * 100, 100)}%`;
+            wasteBar.style.width = `${Math.min(calc.waste_co2 / 2 * 100, 100)}%`;
+
+            // Assessment message
+            let assessment = "";
+            let sustainableDiff = total - 11.5;
+            if (sustainableDiff > 5.0) {
+                assessment = `<span class="badge danger">Above Average</span> Your footprint is high. Try optimizing transit and home heating.`;
+            } else if (sustainableDiff > 0) {
+                assessment = `<span class="badge warning">Moderate</span> You are close to the national target of 11.5 kg. A few smart offsets will get you there!`;
+            } else {
+                assessment = `<span class="badge success">Sustainable</span> Great job! Your footprint is under the sustainable daily limit.`;
+            }
+            targetAssessment.innerHTML = assessment;
+        }
+
+        // Fetch user history & recommendations
+        async function fetchDashboardState() {
+            try {
+                // Fetch Logs History
+                const logsResponse = await fetch(`/api/logs?user_id=${USER_ID}`);
+                const logsData = await logsResponse.json();
+                
+                if (logsResponse.ok && logsData.length > 0) {
+                    // Render history table
+                    historyTbody.innerHTML = "";
+                    logsData.slice().reverse().forEach(log => {
+                        const dateStr = new Date(log.timestamp).toLocaleString();
+                        const tr = document.createElement("tr");
+                        tr.innerHTML = `
+                            <td>${dateStr}</td>
+                            <td><strong>${log.total_co2.toFixed(2)} kg</strong></td>
+                            <td>${(log.electricity_co2 + log.gas_co2).toFixed(2)} kg</td>
+                            <td>${log.transport_co2.toFixed(2)} kg</td>
+                            <td>${log.diet_co2.toFixed(2)} kg</td>
+                            <td>${log.waste_co2.toFixed(2)} kg</td>
+                        `;
+                        historyTbody.appendChild(tr);
+                    });
+
+                    // Update metrics KPI with the most recent log
+                    const latest = logsData[logsData.length - 1];
+                    updateKPIs(latest);
+                }
+
+                // Fetch recommendations
+                const recsResponse = await fetch(`/api/recommendations?user_id=${USER_ID}`);
+                const recsData = await recsResponse.json();
+                
+                if (recsResponse.ok && recsData.length > 0) {
+                    recommendationsContainer.innerHTML = "";
+                    recsData.forEach(rec => {
+                        const card = document.createElement("div");
+                        card.className = "rec-card";
+                        card.setAttribute("role", "article");
+                        
+                        let categoryIcon = `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M2 22c1.25-6.7 5.85-11.3 12.5-12.5C20.2 8.3 22 2 22 2s-6.3 1.8-12.5 7.5C3.8 15.1.7 20.75 2 22z"></path><path d="M9 13l3 3M12 10l3 3"></path></svg>`;
+                        if (rec.category === "transport") {
+                            categoryIcon = `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="16" rx="2" ry="2"></rect><line x1="4" y1="14" x2="20" y2="14"></line><line x1="8" y1="6" x2="16" y2="6"></line><line x1="6" y1="18" x2="6" y2="21"></line><line x1="18" y1="18" x2="18" y2="21"></line><circle cx="8" cy="10" r="1"></circle><circle cx="16" cy="10" r="1"></circle></svg>`;
+                        } else if (rec.category === "electricity") {
+                            categoryIcon = `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`;
+                        } else if (rec.category === "diet") {
+                            categoryIcon = `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M2 22c1.25-6.7 5.85-11.3 12.5-12.5C20.2 8.3 22 2 22 2s-6.3 1.8-12.5 7.5C3.8 15.1.7 20.75 2 22z"></path><path d="M9 13l3 3M12 10l3 3"></path></svg>`;
+                        } else if (rec.category === "waste") {
+                            categoryIcon = `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>`;
+                        }
+
+                        card.innerHTML = `
+                            <div class="rec-icon" aria-hidden="true">${categoryIcon}</div>
+                            <div class="rec-content">
+                                <div class="rec-header">
+                                    <h3>${rec.title}</h3>
+                                    <span class="impact-badge ${rec.impact.toLowerCase()}">${rec.impact} Impact</span>
+                                </div>
+                                <p>${rec.description}</p>
+                                <span class="rec-savings">Potential monthly savings: <strong>${rec.estimated_savings_kg} kg CO₂</strong></span>
+                            </div>
+                        `;
+                        recommendationsContainer.appendChild(card);
+                    });
+                }
+            } catch (err) {
+                console.error("Error updating dashboard details", err);
+            }
+        }
+
+        // Accessibility screen reader announcement helper
+        function announceToScreenReader(message) {
+            ariaAnnounce.textContent = message;
+            setTimeout(() => {
+                ariaAnnounce.textContent = "";
+            }, 3000);
+        }
+
+        // Appearance Customizer (Theme + Accent Color + Font Size + Compact Mode)
+        const appearanceToggleBtn = document.getElementById("appearance-toggle-btn");
+        const appearanceDropdown = document.getElementById("appearance-dropdown");
+
+        if (appearanceToggleBtn && appearanceDropdown) {
+            appearanceToggleBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const isExpanded = appearanceToggleBtn.getAttribute("aria-expanded") === "true";
+                appearanceToggleBtn.setAttribute("aria-expanded", !isExpanded);
+                appearanceDropdown.classList.toggle("show");
+                appearanceDropdown.hidden = isExpanded;
+                appearanceDropdown.setAttribute("aria-hidden", isExpanded);
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener("click", (e) => {
+                if (appearanceDropdown.classList.contains("show") && !appearanceDropdown.contains(e.target) && !appearanceToggleBtn.contains(e.target)) {
+                    appearanceToggleBtn.setAttribute("aria-expanded", "false");
+                    appearanceDropdown.classList.remove("show");
+                    appearanceDropdown.hidden = true;
+                    appearanceDropdown.setAttribute("aria-hidden", "true");
+                }
+            });
+        }
+
+        const themeBtns = document.querySelectorAll(".theme-btn");
+        const accentDots = document.querySelectorAll(".accent-dot");
+        const fontsizeBtns = document.querySelectorAll(".fontsize-btn");
+        const compactToggle = document.getElementById("compact-toggle");
+        const accentNameDisplay = document.getElementById("accent-name-display");
+        const fontsizePreview = document.getElementById("fontsize-preview-text");
+
+        const accentNames = {
+            "#10b981": "Emerald",
+            "#0ea5e9": "Ocean Blue",
+            "#f59e0b": "Sunset Amber",
+            "#a855f7": "Royal Purple",
+            "#f43f5e": "Rose"
+        };
+
+        // Load saved appearance settings
+        const savedTheme = localStorage.getItem("carbonwise_theme") || "dark";
+        const savedAccent = localStorage.getItem("carbonwise_accent") || "#10b981";
+        const savedFontSize = localStorage.getItem("carbonwise_fontsize") || "medium";
+        const savedCompact = localStorage.getItem("carbonwise_compact") === "true";
+
+        applyTheme(savedTheme);
+        applyAccent(savedAccent);
+        applyFontSize(savedFontSize);
+        applyCompact(savedCompact);
+        if (compactToggle) compactToggle.checked = savedCompact;
+
+        // Theme Toggle handlers
+        themeBtns.forEach(btn => {
+            btn.addEventListener("click", () => {
+                const theme = btn.getAttribute("data-theme");
+                applyTheme(theme);
+                localStorage.setItem("carbonwise_theme", theme);
+                announceToScreenReader(`Theme switched to ${theme} mode.`);
+            });
+        });
+
+        // Accent Color Toggle handlers
+        accentDots.forEach(dot => {
+            dot.addEventListener("click", () => {
+                const color = dot.getAttribute("data-accent");
+                applyAccent(color);
+                localStorage.setItem("carbonwise_accent", color);
+                announceToScreenReader(`Accent color changed to ${accentNames[color] || color}.`);
+            });
+        });
+
+        // Font Size handlers
+        fontsizeBtns.forEach(btn => {
+            btn.addEventListener("click", () => {
+                const size = btn.getAttribute("data-size");
+                applyFontSize(size);
+                localStorage.setItem("carbonwise_fontsize", size);
+                announceToScreenReader(`Font size changed to ${size}.`);
+            });
+        });
+
+        // Compact Mode toggle
+        if (compactToggle) {
+            compactToggle.addEventListener("change", () => {
+                applyCompact(compactToggle.checked);
+                localStorage.setItem("carbonwise_compact", compactToggle.checked);
+                announceToScreenReader(compactToggle.checked ? "Compact mode enabled." : "Compact mode disabled.");
+            });
+        }
+
+        function applyTheme(theme) {
+            document.body.classList.remove("light-theme", "glass-theme");
+            themeBtns.forEach(b => {
+                b.classList.remove("active");
+                b.setAttribute("aria-checked", "false");
+            });
+            
+            const selectedBtn = document.querySelector(`.theme-btn[data-theme="${theme}"]`);
+            if (selectedBtn) {
+                selectedBtn.classList.add("active");
+                selectedBtn.setAttribute("aria-checked", "true");
+            }
+
+            if (theme === "light") {
+                document.body.classList.add("light-theme");
+            } else if (theme === "glass") {
+                document.body.classList.add("glass-theme");
+            }
+        }
+
+        function applyAccent(color) {
+            accentDots.forEach(d => {
+                d.classList.remove("active");
+                d.setAttribute("aria-checked", "false");
+            });
+            const activeDot = document.querySelector(`.accent-dot[data-accent="${color}"]`);
+            if (activeDot) {
+                activeDot.classList.add("active");
+                activeDot.setAttribute("aria-checked", "true");
+            }
+            if (accentNameDisplay) accentNameDisplay.textContent = accentNames[color] || "Custom";
+
+            // Update primary theme color variables dynamically on the document root
+            document.documentElement.style.setProperty("--primary", color);
+            
+            // Generate a slightly brighter hover color dynamically
+            const hoverMap = {
+                "#10b981": "#34d399",
+                "#0ea5e9": "#38bdf8",
+                "#f59e0b": "#fbbf24",
+                "#a855f7": "#c084fc",
+                "#f43f5e": "#fb7185"
+            };
+            document.documentElement.style.setProperty("--primary-hover", hoverMap[color] || color);
+        }
+
+        function applyFontSize(size) {
+            document.body.classList.remove("font-small", "font-large");
+            fontsizeBtns.forEach(b => {
+                b.classList.remove("active");
+                b.setAttribute("aria-pressed", "false");
+            });
+            const selectedBtn = document.querySelector(`.fontsize-btn[data-size="${size}"]`);
+            if (selectedBtn) {
+                selectedBtn.classList.add("active");
+                selectedBtn.setAttribute("aria-pressed", "true");
+            }
+            if (size === "small") {
+                document.body.classList.add("font-small");
+                if (fontsizePreview) fontsizePreview.style.fontSize = "0.8rem";
+            } else if (size === "large") {
+                document.body.classList.add("font-large");
+                if (fontsizePreview) fontsizePreview.style.fontSize = "1.3rem";
+            } else {
+                if (fontsizePreview) fontsizePreview.style.fontSize = "1rem";
+            }
+        }
+
+        function applyCompact(isCompact) {
+            if (isCompact) {
+                document.body.classList.add("compact-mode");
+            } else {
+                document.body.classList.remove("compact-mode");
+            }
+        }
+
+        // Initial setup on load
+        window.addEventListener("DOMContentLoaded", async () => {
+            // Setup default values
+            updateKPIs({
+                electricity_co2: 1.92,
+                gas_co2: 0.0,
+                transport_co2: 4.04,
+                diet_co2: 6.8,
+                waste_co2: 0.53,
+                total_co2: 13.29
+            });
+            await fetchDashboardState();
+        });
+    </script>
+</body>
+</html>
