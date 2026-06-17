@@ -3,3 +3,19 @@ service-account.json
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Local databases and dynamic logs
+local_db.json
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE configurations
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db

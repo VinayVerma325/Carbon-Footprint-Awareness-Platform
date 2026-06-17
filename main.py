@@ -58,13 +58,14 @@ class DailyActionRequest(BaseModel):
 @app.get("/")
 def read_root():
     """Serve the primary dashboard interface."""
-    return FileResponse("app.html")
+    return FileResponse("index.html")
 
 
+@app.get("/style.css")
 @app.get("/app.css")
 def read_css():
     """Serve dashboard styling stylesheet."""
-    return FileResponse("app.css")
+    return FileResponse("style.css")
 
 
 # API Endpoints
