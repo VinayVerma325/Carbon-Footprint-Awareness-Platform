@@ -9,6 +9,8 @@ from config import Config
 from core.calculator import CarbonCalculator, RecommendationEngine
 from services.google_services import RoutesServiceClient, FirestoreRepository
 
+from fastapi.middleware.cors import CORSMiddleware
+
 # Setup logging
 logger = logging.getLogger("CarbonPlatformServer")
 
@@ -16,6 +18,15 @@ app = FastAPI(
     title="CarbonWise Platform API",
     description="Backend API serving the Carbon Footprint Awareness Platform.",
     version="1.0.0"
+)
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Initialize services

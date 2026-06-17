@@ -72,6 +72,20 @@
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
+
+                <!-- API Configuration -->
+                <div class="setting-separator"></div>
+                <div class="setting-row">
+                    <span class="setting-label">API Configuration</span>
+                    <div class="form-group-compact" style="margin-top: 0.25rem;">
+                        <label for="settings-api-key">Google Maps API Key</label>
+                        <input type="password" id="settings-api-key" placeholder="AIzaSy...">
+                    </div>
+                    <div class="form-group-compact" style="margin-top: 0.5rem;">
+                        <label for="settings-backend-url">Backend Server URL</label>
+                        <input type="text" id="settings-backend-url" placeholder="e.g. https://api.yoursite.com">
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -377,6 +391,76 @@
         const USER_ID = "demo_user_123";
         let latestCalculations = null;
         let isFetchingRoute = false;
+
+        // API Base URL helper
+        function getApiUrl(endpoint) {
+            const backendUrl = localStorage.getItem("carbonwise_backend_url") || "";
+            if (backendUrl) {
+                const base = backendUrl.endsWith("/") ? backendUrl.slice(0, -1) : backendUrl;
+                return `${base}${endpoint}`;
+            }
+            return endpoint; // Relative URL (works locally with FastAPI)
+        }
+
+        // Direct Google Routes API caller
+        async function calculateRouteDirectly(origin, destination, travelMode, apiKey) {
+            const modeMapping = {
+                "car": "DRIVE",
+                "bus": "TRANSIT",
+                "train": "TRANSIT",
+                "motorcycle": "DRIVE",
+                "walk": "WALK",
+                "bicycle": "BICYCLE"
+            };
+            const apiMode = modeMapping[travelMode.toLowerCase()] || "DRIVE";
+            
+            const body = {
+                origin: { address: origin },
+                destination: { address: destination },
+                travelMode: apiMode
+            };
+
+            if (apiMode === "DRIVE" || apiMode === "TWO_WHEELER") {
+                body.routingPreference = "TRAFFIC_AWARE_OPTIMAL";
+                body.requestedReferenceRoutes = ["FUEL_EFFICIENT"];
+            }
+
+            const response = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Goog-Api-Key": apiKey,
+                    "X-Goog-FieldMask": "routes.distanceMeters,routes.duration,routes.travelAdvisory,routes.localizedValues"
+                },
+                body: JSON.stringify(body)
+            });
+
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(`Google Routes API returned ${response.status}: ${text}`);
+            }
+
+            const data = await response.json();
+            const routes = data.routes || [];
+            if (routes.length > 0) {
+                const primaryRoute = routes[0];
+                const distanceMeters = parseFloat(primaryRoute.distanceMeters) || 0;
+                const durationSeconds = parseInt((primaryRoute.duration || "0s").replace("s", "")) || 0;
+                
+                // 1 meter = 0.000621371 miles
+                const distanceMiles = parseFloat((distanceMeters * 0.000621371).toFixed(2));
+                const ecoFriendly = !!(primaryRoute.travelAdvisory && primaryRoute.travelAdvisory.fuelConsumptionMicroliters);
+                
+                return {
+                    distance_miles: distanceMiles,
+                    duration_seconds: durationSeconds,
+                    eco_friendly: ecoFriendly,
+                    source: "google_routes_api_direct"
+                };
+            } else {
+                throw new Error("No routes found in Google response.");
+            }
+        }
 
         // Client-side Database Fallback (localStorage)
         const LocalDatabase = {
@@ -714,8 +798,10 @@
 
                 let data;
                 let responseOk = false;
+                
+                // 1. Try configured/local backend first
                 try {
-                    const response = await fetch("/api/route", {
+                    const response = await fetch(getApiUrl("/api/route"), {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ origin, destination, travel_mode: mode })
@@ -725,9 +811,23 @@
                         responseOk = true;
                     }
                 } catch (fetchErr) {
-                    console.warn("Backend API not reachable. Using client-side simulation.", fetchErr);
+                    console.warn("Backend API not reachable.", fetchErr);
                 }
 
+                // 2. Try direct client-side Google API call if client-side API Key is provided
+                if (!responseOk) {
+                    const clientApiKey = localStorage.getItem("carbonwise_google_maps_api_key");
+                    if (clientApiKey) {
+                        try {
+                            data = await calculateRouteDirectly(origin, destination, mode, clientApiKey);
+                            responseOk = true;
+                        } catch (directErr) {
+                            console.error("Direct Google API route calculation failed:", directErr);
+                        }
+                    }
+                }
+
+                // 3. Fall back to client-side simulated calculation
                 if (!responseOk) {
                     data = simulateRouteClient(origin, destination, mode);
                 }
@@ -796,7 +896,7 @@
             let calcs = null;
             let success = false;
             try {
-                const response = await fetch("/api/calculate", {
+                const response = await fetch(getApiUrl("/api/calculate"), {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload)
@@ -879,7 +979,7 @@
 
                 let success = false;
                 try {
-                    const response = await fetch("/api/action", {
+                    const response = await fetch(getApiUrl("/api/action"), {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
@@ -969,7 +1069,7 @@
             let logsOk = false;
             try {
                 // Fetch Logs History
-                const logsResponse = await fetch(`/api/logs?user_id=${USER_ID}`);
+                const logsResponse = await fetch(getApiUrl(`/api/logs?user_id=${USER_ID}`));
                 if (logsResponse.ok) {
                     logsData = await logsResponse.json();
                     logsOk = true;
@@ -1008,7 +1108,7 @@
             let recsOk = false;
             try {
                 // Fetch recommendations
-                const recsResponse = await fetch(`/api/recommendations?user_id=${USER_ID}`);
+                const recsResponse = await fetch(getApiUrl(`/api/recommendations?user_id=${USER_ID}`));
                 if (recsResponse.ok) {
                     recsData = await recsResponse.json();
                     recsOk = true;
@@ -1118,6 +1218,8 @@
         const savedAccent = localStorage.getItem("carbonwise_accent") || "#10b981";
         const savedFontSize = localStorage.getItem("carbonwise_fontsize") || "medium";
         const savedCompact = localStorage.getItem("carbonwise_compact") === "true";
+        const savedApiKey = localStorage.getItem("carbonwise_google_maps_api_key") || "";
+        const savedBackendUrl = localStorage.getItem("carbonwise_backend_url") || "";
 
         applyTheme(savedTheme);
         applyAccent(savedAccent);
@@ -1242,6 +1344,24 @@
 
         // Initial setup on load
         window.addEventListener("DOMContentLoaded", async () => {
+            // Bind settings inputs
+            const apiKeyInput = document.getElementById("settings-api-key");
+            const backendUrlInput = document.getElementById("settings-backend-url");
+
+            if (apiKeyInput) {
+                apiKeyInput.value = savedApiKey;
+                apiKeyInput.addEventListener("input", () => {
+                    localStorage.setItem("carbonwise_google_maps_api_key", apiKeyInput.value.trim());
+                });
+            }
+
+            if (backendUrlInput) {
+                backendUrlInput.value = savedBackendUrl;
+                backendUrlInput.addEventListener("input", () => {
+                    localStorage.setItem("carbonwise_backend_url", backendUrlInput.value.trim());
+                });
+            }
+
             // Setup default values
             updateKPIs({
                 electricity_co2: 1.92,
