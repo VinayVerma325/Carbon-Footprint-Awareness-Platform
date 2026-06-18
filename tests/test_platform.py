@@ -388,6 +388,17 @@ class TestAPIEndpoints(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()), 0)
 
+    def test_static_assets_serving(self) -> None:
+        # Check style.css serving
+        resp_css = self.client.get("/style.css")
+        self.assertEqual(resp_css.status_code, 200)
+        self.assertIn("max-age=31536000", resp_css.headers.get("Cache-Control", ""))
+
+        # Check app.js serving
+        resp_js = self.client.get("/app.js")
+        self.assertEqual(resp_js.status_code, 200)
+        self.assertIn("max-age=31536000", resp_js.headers.get("Cache-Control", ""))
+
 
 if __name__ == "__main__":
     unittest.main()

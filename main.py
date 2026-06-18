@@ -76,7 +76,7 @@ class DailyActionRequest(BaseModel):
 
 # Serve Frontend
 @app.get("/")
-def read_root():
+def read_root() -> FileResponse:
     """Serve the primary dashboard interface."""
     return FileResponse(
         os.path.join(BASE_DIR, "index.html"),
@@ -86,7 +86,7 @@ def read_root():
 
 @app.get("/style.css")
 @app.get("/app.css")
-def read_css():
+def read_css() -> FileResponse:
     """Serve dashboard styling stylesheet with caching enabled for efficiency."""
     return FileResponse(
         os.path.join(BASE_DIR, "style.css"),
@@ -94,9 +94,18 @@ def read_css():
     )
 
 
+@app.get("/app.js")
+def read_js() -> FileResponse:
+    """Serve dashboard client script with caching enabled for efficiency."""
+    return FileResponse(
+        os.path.join(BASE_DIR, "app.js"),
+        headers={"Cache-Control": "public, max-age=31536000"}  # cache for 1 year
+    )
+
+
 # API Endpoints
 @app.post("/api/route")
-def estimate_route_distance(payload: RouteRequest):
+def estimate_route_distance(payload: RouteRequest) -> Dict[str, Any]:
     """Estimate distance and duration between origin and destination using Google Routes API."""
     try:
         result = routes_client.calculate_route(
@@ -114,7 +123,7 @@ def estimate_route_distance(payload: RouteRequest):
 
 
 @app.post("/api/calculate")
-def calculate_and_save_footprint(payload: CarbonCalculationRequest):
+def calculate_and_save_footprint(payload: CarbonCalculationRequest) -> Dict[str, Any]:
     """Calculate carbon footprint from user metrics and save log to the database."""
     try:
         # Convert Pydantic request to dictionary for calculation engine
@@ -159,7 +168,7 @@ def calculate_and_save_footprint(payload: CarbonCalculationRequest):
 
 
 @app.post("/api/action")
-def log_green_action(payload: DailyActionRequest):
+def log_green_action(payload: DailyActionRequest) -> Dict[str, Any]:
     """Log an offset/green action completed by the user."""
     try:
         action_data = {
@@ -180,7 +189,7 @@ def log_green_action(payload: DailyActionRequest):
 
 
 @app.get("/api/action")
-def get_green_actions(user_id: str = Query(..., min_length=1)):
+def get_green_actions(user_id: str = Query(..., min_length=1)) -> List[Dict[str, Any]]:
     """Retrieve history of green actions for a user."""
     try:
         actions = db_repo.get_daily_actions(user_id)
@@ -191,7 +200,7 @@ def get_green_actions(user_id: str = Query(..., min_length=1)):
 
 
 @app.get("/api/logs")
-def get_calculation_history(user_id: str = Query(..., min_length=1)):
+def get_calculation_history(user_id: str = Query(..., min_length=1)) -> List[Dict[str, Any]]:
     """Retrieve history of calculation logs for a user."""
     try:
         logs = db_repo.get_user_logs(user_id)
@@ -202,7 +211,7 @@ def get_calculation_history(user_id: str = Query(..., min_length=1)):
 
 
 @app.delete("/api/logs")
-def clear_calculation_history(user_id: str = Query(..., min_length=1)):
+def clear_calculation_history(user_id: str = Query(..., min_length=1)) -> Dict[str, Any]:
     """Clear all calculation logs and actions for a user."""
     try:
         cleared_logs = db_repo.clear_user_logs(user_id)
@@ -218,7 +227,7 @@ def clear_calculation_history(user_id: str = Query(..., min_length=1)):
 
 
 @app.get("/api/recommendations")
-def get_personalized_recommendations(user_id: str = Query(..., min_length=1)):
+def get_personalized_recommendations(user_id: str = Query(..., min_length=1)) -> List[Dict[str, Any]]:
     """Analyze database logs to generate structured, personalized insights for the user."""
     try:
         logs = db_repo.get_user_logs(user_id)
