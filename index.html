@@ -371,6 +371,28 @@
                     </table>
                 </div>
             </div>
+
+            <div class="logs-history-box" style="margin-top: 2rem;">
+                <div class="history-header">
+                    <h3>Logged Green Actions</h3>
+                </div>
+                <div class="table-wrapper">
+                    <table class="history-table" id="actions-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Date/Time</th>
+                                <th scope="col">Action</th>
+                                <th scope="col">Carbon Offset</th>
+                            </tr>
+                        </thead>
+                        <tbody id="actions-tbody">
+                            <tr>
+                                <td colspan="3" class="empty-table">No green actions logged today. Complete offset actions to earn credits.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </section>
     </main>
 
@@ -927,22 +949,23 @@
         });
 
         // Helper to update progress ring & KPI details
-        function updateKPIs(calc) {
-            const total = calc.total_co2;
-            totalCo2Value.textContent = total.toFixed(1);
+        function updateKPIs(calc, offsetVal = 0) {
+            const rawTotal = calc.total_co2;
+            const netTotal = Math.max(0, rawTotal - offsetVal);
+            totalCo2Value.textContent = netTotal.toFixed(1);
             
             // Limit scale to 30kg for the dashboard ring
             const maxVal = 25.0;
-            const percentage = Math.min((total / maxVal), 1.0);
+            const percentage = Math.min((netTotal / maxVal), 1.0);
             
             // Circumference of radius 70 is 2 * pi * 70 = 439.82
             const offset = 439.82 - (percentage * 439.82);
             totalCo2Ring.style.strokeDashoffset = offset;
 
             // Set color state based on emissions levels
-            if (total > 15) {
+            if (netTotal > 15) {
                 totalCo2Ring.style.stroke = "#ef4444"; // red
-            } else if (total > 8) {
+            } else if (netTotal > 8) {
                 totalCo2Ring.style.stroke = "#f59e0b"; // yellow
             } else {
                 totalCo2Ring.style.stroke = "url(#emerald-gradient)"; // emerald
@@ -962,13 +985,16 @@
 
             // Assessment message
             let assessment = "";
-            let sustainableDiff = total - 11.5;
+            let sustainableDiff = netTotal - 11.5;
             if (sustainableDiff > 5.0) {
                 assessment = `<span class="badge danger">Above Average</span> Your footprint is high. Try optimizing transit and home heating.`;
             } else if (sustainableDiff > 0) {
                 assessment = `<span class="badge warning">Moderate</span> You are close to the national target of 11.5 kg. A few smart offsets will get you there!`;
             } else {
                 assessment = `<span class="badge success">Sustainable</span> Great job! Your footprint is under the sustainable daily limit.`;
+            }
+            if (offsetVal > 0) {
+                assessment += ` <span class="badge info">Offset Applied</span> Applied -${offsetVal.toFixed(1)} kg CO₂ from daily green actions.`;
             }
             targetAssessment.innerHTML = assessment;
         }
@@ -989,13 +1015,53 @@
                     return null;
                 });
 
-            const [logsData, serverRecsData] = await Promise.all([logsPromise, recsPromise]);
+            const actionsPromise = fetch(getApiUrl(`/api/action?user_id=${USER_ID}`))
+                .then(r => r.ok ? r.json() : Promise.reject())
+                .catch(() => {
+                    console.warn("Backend API `/api/action` not reachable. Using localStorage.");
+                    return LocalDatabase.getActions();
+                });
+
+            const [logsData, serverRecsData, actionsData] = await Promise.all([logsPromise, recsPromise, actionsPromise]);
+
+            const todayStr = new Date().toISOString().slice(0, 10);
+            
+            // Calculate total green offsets for today
+            const todayActions = actionsData.filter(act => {
+                try {
+                    return act.timestamp && act.timestamp.slice(0, 10) === todayStr;
+                } catch(e) { return false; }
+            });
+            const totalOffset = todayActions.reduce((sum, act) => sum + (parseFloat(act.carbon_offset_kg) || 0), 0);
+
+            // Render green actions table
+            const actionsTbody = document.getElementById("actions-tbody");
+            if (actionsTbody) {
+                actionsTbody.innerHTML = "";
+                const displayActions = showAllHistory ? actionsData : todayActions;
+                
+                if (displayActions.length === 0) {
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `<td colspan="3" class="empty-table">No green actions logged ${showAllHistory ? 'yet' : 'today'}.</td>`;
+                    actionsTbody.appendChild(tr);
+                } else {
+                    displayActions.slice().reverse().forEach(act => {
+                        const dateStr = new Date(act.timestamp).toLocaleString();
+                        const tr = document.createElement("tr");
+                        tr.innerHTML = `
+                            <td>${dateStr}</td>
+                            <td><strong>${act.title || act.action}</strong></td>
+                            <td style="color: var(--primary);">-${parseFloat(act.carbon_offset_kg).toFixed(1)} kg CO₂</td>
+                        `;
+                        actionsTbody.appendChild(tr);
+                    });
+                }
+            }
 
             if (logsData.length > 0) {
                 // Filter to today's logs only, unless "Show All" is toggled
                 let displayLogs = logsData;
                 if (!showAllHistory) {
-                    const todayStr = new Date().toISOString().slice(0, 10);
                     displayLogs = logsData.filter(log => {
                         try {
                             return log.timestamp && log.timestamp.slice(0, 10) === todayStr;
@@ -1027,7 +1093,7 @@
 
                 // Update metrics KPI with the most recent log
                 const latest = logsData[logsData.length - 1];
-                updateKPIs(latest);
+                updateKPIs(latest, totalOffset);
             }
 
             let recsData = serverRecsData;

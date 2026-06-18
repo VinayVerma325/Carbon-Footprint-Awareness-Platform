@@ -179,6 +179,17 @@ def log_green_action(payload: DailyActionRequest):
         raise HTTPException(status_code=500, detail="Internal database error.")
 
 
+@app.get("/api/action")
+def get_green_actions(user_id: str = Query(..., min_length=1)):
+    """Retrieve history of green actions for a user."""
+    try:
+        actions = db_repo.get_daily_actions(user_id)
+        return actions
+    except Exception as e:
+        logger.error(f"Error fetching user actions: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal database retrieval error.")
+
+
 @app.get("/api/logs")
 def get_calculation_history(user_id: str = Query(..., min_length=1)):
     """Retrieve history of calculation logs for a user."""
@@ -192,16 +203,17 @@ def get_calculation_history(user_id: str = Query(..., min_length=1)):
 
 @app.delete("/api/logs")
 def clear_calculation_history(user_id: str = Query(..., min_length=1)):
-    """Clear all calculation logs for a user."""
+    """Clear all calculation logs and actions for a user."""
     try:
-        cleared = db_repo.clear_user_logs(user_id)
-        if not cleared:
-            raise HTTPException(status_code=500, detail="Failed to clear user logs.")
-        return {"status": "success", "message": "All calculation history cleared."}
+        cleared_logs = db_repo.clear_user_logs(user_id)
+        cleared_actions = db_repo.clear_user_actions(user_id)
+        if not cleared_logs or not cleared_actions:
+            raise HTTPException(status_code=500, detail="Failed to clear user logs/actions.")
+        return {"status": "success", "message": "All calculation history and actions cleared."}
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error clearing user logs: {str(e)}")
+        logger.error(f"Error clearing user data: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal database error.")
 
 

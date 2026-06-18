@@ -41,6 +41,11 @@ class RoutesServiceClient:
         if not origin or not destination:
             raise ValueError("Origin and destination addresses are required.")
             
+        # Flight mode is not supported by Google Routes API, simulate it directly
+        if travel_mode.lower() == "flight":
+            logger.info("Flight mode requested. Simulating route calculation.")
+            return self._simulate_route(origin, destination, travel_mode)
+
         # Map frontend travel modes to Routes API travel modes
         mode_mapping = {
             "car": "DRIVE",
@@ -114,14 +119,22 @@ class RoutesServiceClient:
         """Provide a secure fallback simulation for offline mode and missing API keys."""
         # Simple deterministic distance simulation based on characters
         hash_val = sum(ord(c) for c in (origin + destination))
-        simulated_distance = round((hash_val % 450) + 5.5, 2)
+        if travel_mode.lower() == "flight":
+            # Flights are typically longer distances
+            simulated_distance = round((hash_val % 2500) + 100.5, 2)
+        else:
+            simulated_distance = round((hash_val % 450) + 5.5, 2)
         
-        # Estimate duration (average 45 mph for driving, 3 mph walking, etc.)
+        # Estimate duration based on travel mode speed (mph)
         speed_mph = 40.0
-        if travel_mode.lower() in ["walk", "bicycle"]:
-            speed_mph = 10.0
+        if travel_mode.lower() == "walk":
+            speed_mph = 3.0
+        elif travel_mode.lower() in ["bicycle", "bike"]:
+            speed_mph = 12.0
         elif travel_mode.lower() in ["bus", "train"]:
             speed_mph = 35.0
+        elif travel_mode.lower() == "flight":
+            speed_mph = 500.0
             
         duration_seconds = int((simulated_distance / speed_mph) * 3600)
         
@@ -269,6 +282,27 @@ class FirestoreRepository:
                 db_data = self._read_local_db()
                 if user_id in db_data["logs"]:
                     db_data["logs"][user_id] = []
+                    self._write_local_db(db_data)
+                return True
+        except Exception as local_err:
+            logger.error(f"Local DB fallback failed: {str(local_err)}")
+            return False
+
+    def clear_user_actions(self, user_id: str) -> bool:
+        """Clear all green actions for a user."""
+        try:
+            if not self.use_fallback and self.db:
+                docs = self.db.collection("users").document(user_id).collection("actions").stream()
+                for doc in docs:
+                    doc.reference.delete()
+        except Exception as e:
+            logger.error(f"Error clearing user actions from Firestore: {str(e)}. Falling back to local DB.")
+
+        try:
+            with self._lock:
+                db_data = self._read_local_db()
+                if user_id in db_data["actions"]:
+                    db_data["actions"][user_id] = []
                     self._write_local_db(db_data)
                 return True
         except Exception as local_err:

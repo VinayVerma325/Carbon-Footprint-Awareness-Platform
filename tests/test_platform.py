@@ -209,6 +209,17 @@ class TestRoutesServiceClient(unittest.TestCase):
         self.assertEqual(result["source"], "simulated_fallback")
         self.assertGreater(result["distance_miles"], 0)
 
+    def test_calculate_route_flight_simulation(self) -> None:
+        client = RoutesServiceClient()
+        # Flight mode should bypass standard route and simulate immediately
+        client.api_key = "dummy_api_key"
+        result = client.calculate_route("New York, NY", "London, UK", "flight")
+        self.assertEqual(result["source"], "simulated_fallback")
+        # Assert flight speed matches 500 mph
+        speed_mph = 500.0
+        expected_duration = int((result["distance_miles"] / speed_mph) * 3600)
+        self.assertEqual(result["duration_seconds"], expected_duration)
+
 
 class TestFirestoreRepository(unittest.TestCase):
     """Mock-based and local-fallback test suite for user logging repositories."""
@@ -245,6 +256,17 @@ class TestFirestoreRepository(unittest.TestCase):
             
             profile = repo.get_user_profile("user_999")
             self.assertEqual(profile["preferred_mode"], "EV")
+
+            # Actions CRUD
+            action_data = {"action": "led_lights", "carbon_offset_kg": 0.5, "timestamp": "2026-06-16T12:00:00Z"}
+            self.assertTrue(repo.save_daily_action("user_999", action_data))
+            actions = repo.get_daily_actions("user_999")
+            self.assertEqual(len(actions), 1)
+            self.assertEqual(actions[0]["action"], "led_lights")
+            
+            # Clear Actions
+            self.assertTrue(repo.clear_user_actions("user_999"))
+            self.assertEqual(len(repo.get_daily_actions("user_999")), 0)
 
     def test_live_firestore_exception_fallback(self) -> None:
         with patch("services.google_services.FIRESTORE_AVAILABLE", True):
@@ -349,6 +371,22 @@ class TestAPIEndpoints(unittest.TestCase):
         response = self.client.post("/api/action", json=payload)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "success")
+
+        # Get actions
+        response = self.client.get("/api/action?user_id=test_user_action")
+        self.assertEqual(response.status_code, 200)
+        actions = response.json()
+        self.assertEqual(len(actions), 1)
+        self.assertEqual(actions[0]["action"], "meatless_meal")
+
+        # Clear logs and actions
+        response = self.client.delete("/api/logs?user_id=test_user_action")
+        self.assertEqual(response.status_code, 200)
+        
+        # Verify actions are cleared
+        response = self.client.get("/api/action?user_id=test_user_action")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 0)
 
 
 if __name__ == "__main__":
