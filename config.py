@@ -46,11 +46,14 @@ class Config:
     
     ENV: str = os.getenv("ENV", "development").lower()
     
-    # Google Routes API Key
-    GOOGLE_MAPS_API_KEY: Optional[str] = os.getenv("GOOGLE_MAPS_API_KEY") or "AIzaSyBMSXnLgET1t5XOfXzFTFaeRktafqcDbdM"
+    # Google Routes API Key — must come from environment only. Never hardcode a
+    # real key here as a "default": this file is tracked by git, so a literal
+    # key string here gets committed permanently. If unset, RoutesServiceClient
+    # already degrades gracefully to its own simulated_fallback mode.
+    GOOGLE_MAPS_API_KEY: Optional[str] = os.getenv("GOOGLE_MAPS_API_KEY")
     
     # Firebase / Firestore Configurations
-    FIREBASE_PROJECT_ID: Optional[str] = os.getenv("FIREBASE_PROJECT_ID") or "carbonfootprintplatform-c0afa"
+    FIREBASE_PROJECT_ID: Optional[str] = os.getenv("FIREBASE_PROJECT_ID")
     FIREBASE_CREDENTIALS_JSON: Optional[str] = os.getenv("FIREBASE_CREDENTIALS_JSON")
     GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or "service-account.json"
     

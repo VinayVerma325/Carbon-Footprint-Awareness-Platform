@@ -1,5 +1,6 @@
 import datetime
 import logging
+import os
 from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
@@ -21,13 +22,19 @@ app = FastAPI(
 )
 
 # Configure CORS
+# allow_credentials=False because no cookies/auth headers are used anywhere in
+# this API (user_id is just a plain request field). Wildcard origin + credentials=True
+# is an unnecessary, meaningless-for-this-app combination that browsers also reject
+# unless the server echoes back a specific origin instead of "*".
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Initialize services
 routes_client = RoutesServiceClient()
@@ -69,14 +76,14 @@ class DailyActionRequest(BaseModel):
 @app.get("/")
 def read_root():
     """Serve the primary dashboard interface."""
-    return FileResponse("index.html")
+    return FileResponse(os.path.join(BASE_DIR, "index.html"))
 
 
 @app.get("/style.css")
 @app.get("/app.css")
 def read_css():
     """Serve dashboard styling stylesheet."""
-    return FileResponse("style.css")
+    return FileResponse(os.path.join(BASE_DIR, "style.css"))
 
 
 # API Endpoints
