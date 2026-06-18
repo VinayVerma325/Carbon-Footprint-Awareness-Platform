@@ -40,6 +40,8 @@ class RoutesServiceClient:
         """
         if not origin or not destination:
             raise ValueError("Origin and destination addresses are required.")
+        if len(origin) > 500 or len(destination) > 500:
+            raise ValueError("Origin and destination address strings must not exceed 500 characters.")
             
         # Flight mode is not supported by Google Routes API, simulate it directly
         if travel_mode.lower() == "flight":

@@ -73,6 +73,12 @@ class Config:
     # Local fallback file database path
     LOCAL_DB_PATH: str = os.getenv("LOCAL_DB_PATH", "local_db.json")
 
+    # CORS configuration
+    ALLOWED_ORIGINS: list = [
+        o.strip() for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",") if o.strip()
+    ]
+
+
     @classmethod
     def validate_config(cls) -> None:
         """Validate if required API keys are available, logging warnings for fallbacks."""

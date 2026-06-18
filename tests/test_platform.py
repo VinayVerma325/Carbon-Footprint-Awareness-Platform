@@ -399,6 +399,91 @@ class TestAPIEndpoints(unittest.TestCase):
         self.assertEqual(resp_js.status_code, 200)
         self.assertIn("max-age=31536000", resp_js.headers.get("Cache-Control", ""))
 
+    def test_security_headers_present(self) -> None:
+        resp = self.client.get("/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.headers.get("X-Frame-Options"), "DENY")
+        self.assertEqual(resp.headers.get("X-Content-Type-Options"), "nosniff")
+        self.assertEqual(resp.headers.get("X-XSS-Protection"), "1; mode=block")
+        self.assertEqual(resp.headers.get("Referrer-Policy"), "strict-origin-when-cross-origin")
+        self.assertIn("Content-Security-Policy", resp.headers)
+
+    def test_cors_origin_restriction(self) -> None:
+        # Request with a disallowed origin
+        resp = self.client.get("/", headers={"Origin": "https://malicious.com"})
+        self.assertNotEqual(resp.headers.get("Access-Control-Allow-Origin"), "https://malicious.com")
+
+        # Request with an allowed origin
+        resp = self.client.get("/", headers={"Origin": "http://localhost:8000"})
+        self.assertEqual(resp.headers.get("Access-Control-Allow-Origin"), "http://localhost:8000")
+
+    def test_net_co2_calculations(self) -> None:
+        # Total = 10, offset = 4 => net = 6
+        net = CarbonCalculator.calculate_net(10.0, 4.0)
+        self.assertEqual(net, 6.0)
+
+        # Offsets exceeding total should clip to 0
+        net = CarbonCalculator.calculate_net(5.0, 10.0)
+        self.assertEqual(net, 0.0)
+
+        with self.assertRaises(ValueError):
+            CarbonCalculator.calculate_net(-1.0, 5.0)
+        with self.assertRaises(ValueError):
+            CarbonCalculator.calculate_net(5.0, -1.0)
+
+    def test_calculate_endpoint_with_net_co2(self) -> None:
+        # First save an action to apply offset
+        action_payload = {
+            "user_id": "test_net_user",
+            "action": "public_transit",
+            "title": "Took Public Transit",
+            "carbon_offset_kg": 1.8
+        }
+        self.client.post("/api/action", json=action_payload)
+
+        # Calculate emissions
+        payload = {
+            "user_id": "test_net_user",
+            "electricity_kwh": 5.0,
+            "gas_m3": 0.0,
+            "transport": [],
+            "diet_type": "vegan",
+            "diet_days": 1,
+            "waste_kg": 0.0,
+            "waste_recycling_rate": 0.0
+        }
+        response = self.client.post("/api/calculate", json=payload)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("net_co2", data["calculations"])
+        # Total co2 = 5 * 0.385 + 4.1 = 1.925 + 4.1 = 6.025
+        # Net = 6.025 - 1.8 = 4.225
+        self.assertEqual(data["calculations"]["net_co2"], 4.225)
+
+        # Fetch logs
+        logs_resp = self.client.get("/api/logs?user_id=test_net_user")
+        self.assertEqual(logs_resp.status_code, 200)
+        logs = logs_resp.json()
+        self.assertEqual(logs[0]["net_co2"], 4.225)
+
+    def test_input_validation_edge_cases(self) -> None:
+        # Extremely long origin address
+        payload = {
+            "origin": "A" * 501,
+            "destination": "Test Destination",
+            "travel_mode": "car"
+        }
+        response = self.client.post("/api/route", json=payload)
+        self.assertEqual(response.status_code, 422)  # Pydantic validation error
+
+        # Invalid numeric fields
+        calc_payload = {
+            "user_id": "test_validation_user",
+            "electricity_kwh": -10.0,  # invalid negative value
+        }
+        response = self.client.post("/api/calculate", json=calc_payload)
+        self.assertEqual(response.status_code, 422)
+
 
 if __name__ == "__main__":
     unittest.main()

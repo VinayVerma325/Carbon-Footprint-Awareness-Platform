@@ -4,6 +4,12 @@ let latestCalculations = null;
 let isFetchingRoute = false;
 let showAllHistory = false;
 
+// Global Constants
+const SUSTAINABLE_DAILY_LIMIT = 11.5; // National green target limit in kg CO2
+const MAX_RING_VALUE = 25.0; // Max threshold value for dashboard progress ring scaling
+const RING_CIRCUMFERENCE = 439.82; // SVG progress ring circumference (2 * Math.PI * 70)
+
+
 // API endpoint helper — always same-origin, served by our own FastAPI
 // backend. No client-side Google Maps key, no user-configurable backend
 // URL: the browser only ever talks to our server at /api/*, which holds
@@ -355,7 +361,22 @@ calcRouteBtn.addEventListener("click", async () => {
             distanceInput.value = km;
             if (isFallback) {
                 routeResultDiv.className = "route-feedback warning";
-                routeResultDiv.innerHTML = `⚠️ Estimated distance (live Google Maps routing isn't configured on this server). Distance: <strong>${km} km</strong>.<br><small style="margin-top: 0.25rem; display: block; opacity: 0.9;">This is a placeholder, not a real route. Site owner: set GOOGLE_MAPS_API_KEY in .env to enable live routing.</small>`;
+                routeResultDiv.textContent = "";
+                const msg = document.createTextNode("⚠️ Estimated distance (live Google Maps routing isn't configured on this server). Distance: ");
+                const val = document.createElement("strong");
+                val.textContent = `${km} km`;
+                const period = document.createTextNode(".");
+                const br = document.createElement("br");
+                const small = document.createElement("small");
+                small.style.marginTop = "0.25rem";
+                small.style.display = "block";
+                small.style.opacity = "0.9";
+                small.textContent = "This is a placeholder, not a real route. Site owner: set GOOGLE_MAPS_API_KEY in .env to enable live routing.";
+                routeResultDiv.appendChild(msg);
+                routeResultDiv.appendChild(val);
+                routeResultDiv.appendChild(period);
+                routeResultDiv.appendChild(br);
+                routeResultDiv.appendChild(small);
             } else {
                 routeResultDiv.className = "route-feedback success";
                 routeResultDiv.textContent = `Route estimated! Distance: ${km} km. Source: ${data.source.replace(/_/g, ' ')}.`;
@@ -365,7 +386,22 @@ calcRouteBtn.addEventListener("click", async () => {
             distanceInput.value = miles;
             if (isFallback) {
                 routeResultDiv.className = "route-feedback warning";
-                routeResultDiv.innerHTML = `⚠️ Estimated distance (live Google Maps routing isn't configured on this server). Distance: <strong>${miles} miles</strong>.<br><small style="margin-top: 0.25rem; display: block; opacity: 0.9;">This is a placeholder, not a real route. Site owner: set GOOGLE_MAPS_API_KEY in .env to enable live routing.</small>`;
+                routeResultDiv.textContent = "";
+                const msg = document.createTextNode("⚠️ Estimated distance (live Google Maps routing isn't configured on this server). Distance: ");
+                const val = document.createElement("strong");
+                val.textContent = `${miles} miles`;
+                const period = document.createTextNode(".");
+                const br = document.createElement("br");
+                const small = document.createElement("small");
+                small.style.marginTop = "0.25rem";
+                small.style.display = "block";
+                small.style.opacity = "0.9";
+                small.textContent = "This is a placeholder, not a real route. Site owner: set GOOGLE_MAPS_API_KEY in .env to enable live routing.";
+                routeResultDiv.appendChild(msg);
+                routeResultDiv.appendChild(val);
+                routeResultDiv.appendChild(period);
+                routeResultDiv.appendChild(br);
+                routeResultDiv.appendChild(small);
             } else {
                 routeResultDiv.className = "route-feedback success";
                 routeResultDiv.textContent = `Route estimated! Distance: ${miles} miles. Source: ${data.source.replace(/_/g, ' ')}.`;
@@ -547,12 +583,11 @@ function updateKPIs(calc, offsetVal = 0) {
     const netTotal = Math.max(0, rawTotal - offsetVal);
     totalCo2Value.textContent = netTotal.toFixed(1);
     
-    // Limit scale to 30kg for the dashboard ring
-    const maxVal = 25.0;
-    const percentage = Math.min((netTotal / maxVal), 1.0);
+    // Limit scale for the dashboard ring using MAX_RING_VALUE
+    const percentage = Math.min((netTotal / MAX_RING_VALUE), 1.0);
     
-    // Circumference of radius 70 is 2 * pi * 70 = 439.82
-    const offset = 439.82 - (percentage * 439.82);
+    // Circumference of radius 70 is 2 * pi * 70 = RING_CIRCUMFERENCE
+    const offset = RING_CIRCUMFERENCE - (percentage * RING_CIRCUMFERENCE);
     totalCo2Ring.style.strokeDashoffset = offset;
 
     // Set color state based on emissions levels
@@ -576,20 +611,36 @@ function updateKPIs(calc, offsetVal = 0) {
     dietBar.style.width = `${Math.min(calc.diet_co2 / 10 * 100, 100)}%`;
     wasteBar.style.width = `${Math.min(calc.waste_co2 / 2 * 100, 100)}%`;
 
-    // Assessment message
-    let assessment = "";
-    let sustainableDiff = netTotal - 11.5;
+    // Assessment message using safe DOM builder pattern
+    targetAssessment.textContent = "";
+    const badgeSpan = document.createElement("span");
+    let textNode;
+    let sustainableDiff = netTotal - SUSTAINABLE_DAILY_LIMIT;
     if (sustainableDiff > 5.0) {
-        assessment = `<span class="badge danger">Above Average</span> Your footprint is high. Try optimizing transit and home heating.`;
+        badgeSpan.className = "badge danger";
+        badgeSpan.textContent = "Above Average";
+        textNode = document.createTextNode(" Your footprint is high. Try optimizing transit and home heating.");
     } else if (sustainableDiff > 0) {
-        assessment = `<span class="badge warning">Moderate</span> You are close to the national target of 11.5 kg. A few smart offsets will get you there!`;
+        badgeSpan.className = "badge warning";
+        badgeSpan.textContent = "Moderate";
+        textNode = document.createTextNode(` You are close to the national target of ${SUSTAINABLE_DAILY_LIMIT} kg. A few smart offsets will get you there!`);
     } else {
-        assessment = `<span class="badge success">Sustainable</span> Great job! Your footprint is under the sustainable daily limit.`;
+        badgeSpan.className = "badge success";
+        badgeSpan.textContent = "Sustainable";
+        textNode = document.createTextNode(" Great job! Your footprint is under the sustainable daily limit.");
     }
+    targetAssessment.appendChild(badgeSpan);
+    targetAssessment.appendChild(textNode);
+
     if (offsetVal > 0) {
-        assessment += ` <span class="badge info">Offset Applied</span> Applied -${offsetVal.toFixed(1)} kg CO₂ from daily green actions.`;
+        const offsetSpan = document.createElement("span");
+        offsetSpan.className = "badge info";
+        offsetSpan.textContent = "Offset Applied";
+        offsetSpan.style.marginLeft = "0.5rem";
+        const offsetText = document.createTextNode(` Applied -${offsetVal.toFixed(1)} kg CO₂ from daily green actions.`);
+        targetAssessment.appendChild(offsetSpan);
+        targetAssessment.appendChild(offsetText);
     }
-    targetAssessment.innerHTML = assessment;
 }
 
 // Fetch user history & recommendations in parallel
@@ -630,22 +681,38 @@ async function fetchDashboardState() {
     // Render green actions table
     const actionsTbody = document.getElementById("actions-tbody");
     if (actionsTbody) {
-        actionsTbody.innerHTML = "";
+        actionsTbody.textContent = "";
         const displayActions = showAllHistory ? actionsData : todayActions;
         
         if (displayActions.length === 0) {
             const tr = document.createElement("tr");
-            tr.innerHTML = `<td colspan="3" class="empty-table">No green actions logged ${showAllHistory ? 'yet' : 'today'}.</td>`;
+            const td = document.createElement("td");
+            td.colSpan = 3;
+            td.className = "empty-table";
+            td.textContent = `No green actions logged ${showAllHistory ? 'yet' : 'today'}.`;
+            tr.appendChild(td);
             actionsTbody.appendChild(tr);
         } else {
             displayActions.slice().reverse().forEach(act => {
                 const dateStr = new Date(act.timestamp).toLocaleString();
                 const tr = document.createElement("tr");
-                tr.innerHTML = `
-                    <td>${dateStr}</td>
-                    <td><strong>${act.title || act.action}</strong></td>
-                    <td style="color: var(--primary); font-weight: 500;">-${parseFloat(act.carbon_offset_kg).toFixed(1)} kg CO₂</td>
-                `;
+                
+                const tdDate = document.createElement("td");
+                tdDate.textContent = dateStr;
+                
+                const tdTitle = document.createElement("td");
+                const strongTitle = document.createElement("strong");
+                strongTitle.textContent = act.title || act.action;
+                tdTitle.appendChild(strongTitle);
+                
+                const tdOffset = document.createElement("td");
+                tdOffset.style.color = "var(--primary)";
+                tdOffset.style.fontWeight = "500";
+                tdOffset.textContent = `-${parseFloat(act.carbon_offset_kg).toFixed(1)} kg CO₂`;
+                
+                tr.appendChild(tdDate);
+                tr.appendChild(tdTitle);
+                tr.appendChild(tdOffset);
                 actionsTbody.appendChild(tr);
             });
         }
@@ -663,23 +730,47 @@ async function fetchDashboardState() {
         }
 
         // Render history table
-        historyTbody.innerHTML = "";
+        historyTbody.textContent = "";
         if (displayLogs.length === 0) {
             const tr = document.createElement("tr");
-            tr.innerHTML = `<td colspan="6" class="empty-table">No logs for today. Submit a daily log to start tracking.</td>`;
+            const td = document.createElement("td");
+            td.colSpan = 6;
+            td.className = "empty-table";
+            td.textContent = "No logs for today. Submit a daily log to start tracking.";
+            tr.appendChild(td);
             historyTbody.appendChild(tr);
         } else {
             displayLogs.slice().reverse().forEach(log => {
                 const dateStr = new Date(log.timestamp).toLocaleString();
                 const tr = document.createElement("tr");
-                tr.innerHTML = `
-                    <td>${dateStr}</td>
-                    <td><strong>${log.total_co2.toFixed(2)} kg</strong></td>
-                    <td>${(log.electricity_co2 + log.gas_co2).toFixed(2)} kg</td>
-                    <td>${log.transport_co2.toFixed(2)} kg</td>
-                    <td>${log.diet_co2.toFixed(2)} kg</td>
-                    <td>${log.waste_co2.toFixed(2)} kg</td>
-                `;
+                
+                const tdDate = document.createElement("td");
+                tdDate.textContent = dateStr;
+                
+                const tdTotal = document.createElement("td");
+                const strongTotal = document.createElement("strong");
+                const co2Val = log.net_co2 !== undefined ? log.net_co2 : log.total_co2;
+                strongTotal.textContent = `${co2Val.toFixed(2)} kg`;
+                tdTotal.appendChild(strongTotal);
+                
+                const tdEnergy = document.createElement("td");
+                tdEnergy.textContent = `${(log.electricity_co2 + log.gas_co2).toFixed(2)} kg`;
+                
+                const tdTransport = document.createElement("td");
+                tdTransport.textContent = `${log.transport_co2.toFixed(2)} kg`;
+                
+                const tdDiet = document.createElement("td");
+                tdDiet.textContent = `${log.diet_co2.toFixed(2)} kg`;
+                
+                const tdWaste = document.createElement("td");
+                tdWaste.textContent = `${log.waste_co2.toFixed(2)} kg`;
+                
+                tr.appendChild(tdDate);
+                tr.appendChild(tdTotal);
+                tr.appendChild(tdEnergy);
+                tr.appendChild(tdTransport);
+                tr.appendChild(tdDiet);
+                tr.appendChild(tdWaste);
                 historyTbody.appendChild(tr);
             });
         }
@@ -705,7 +796,8 @@ async function fetchDashboardState() {
     }
 
     if (recsData && recsData.length > 0) {
-        recommendationsContainer.innerHTML = "";
+        recommendationsContainer.textContent = "";
+        const parser = new DOMParser();
         recsData.forEach(rec => {
             const card = document.createElement("div");
             card.className = "rec-card";
@@ -722,17 +814,46 @@ async function fetchDashboardState() {
                 categoryIcon = `<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>`;
             }
 
-            card.innerHTML = `
-                <div class="rec-icon" aria-hidden="true">${categoryIcon}</div>
-                <div class="rec-content">
-                    <div class="rec-header">
-                        <h3>${rec.title}</h3>
-                        <span class="impact-badge ${rec.impact.toLowerCase()}">${rec.impact} Impact</span>
-                    </div>
-                    <p>${rec.description}</p>
-                    <span class="rec-savings">Potential monthly savings: <strong>${rec.estimated_savings_kg} kg CO₂</strong></span>
-                </div>
-            `;
+            const svgDoc = parser.parseFromString(categoryIcon, "image/svg+xml");
+            const svgElement = svgDoc.documentElement;
+
+            const iconDiv = document.createElement("div");
+            iconDiv.className = "rec-icon";
+            iconDiv.setAttribute("aria-hidden", "true");
+            iconDiv.appendChild(svgElement);
+
+            const recContent = document.createElement("div");
+            recContent.className = "rec-content";
+
+            const recHeader = document.createElement("div");
+            recHeader.className = "rec-header";
+
+            const h3 = document.createElement("h3");
+            h3.textContent = rec.title;
+
+            const impactSpan = document.createElement("span");
+            impactSpan.className = `impact-badge ${rec.impact.toLowerCase()}`;
+            impactSpan.textContent = `${rec.impact} Impact`;
+
+            recHeader.appendChild(h3);
+            recHeader.appendChild(impactSpan);
+
+            const p = document.createElement("p");
+            p.textContent = rec.description;
+
+            const savingsSpan = document.createElement("span");
+            savingsSpan.className = "rec-savings";
+            savingsSpan.textContent = "Potential monthly savings: ";
+            const strongSavings = document.createElement("strong");
+            strongSavings.textContent = `${rec.estimated_savings_kg} kg CO₂`;
+            savingsSpan.appendChild(strongSavings);
+
+            recContent.appendChild(recHeader);
+            recContent.appendChild(p);
+            recContent.appendChild(savingsSpan);
+
+            card.appendChild(iconDiv);
+            card.appendChild(recContent);
             recommendationsContainer.appendChild(card);
         });
     }
@@ -941,7 +1062,14 @@ if (clearHistoryBtn) {
         localStorage.removeItem("carbonwise_actions");
 
         // Reset UI
-        historyTbody.innerHTML = `<tr><td colspan="6" class="empty-table">No calculation history available. Log a footprint to populate.</td></tr>`;
+        historyTbody.textContent = "";
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = 6;
+        td.className = "empty-table";
+        td.textContent = "No calculation history available. Log a footprint to populate.";
+        tr.appendChild(td);
+        historyTbody.appendChild(tr);
         announceToScreenReader("All calculation history has been cleared.");
         await fetchDashboardState();
     });

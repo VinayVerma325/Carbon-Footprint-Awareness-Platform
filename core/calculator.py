@@ -125,6 +125,16 @@ class CarbonCalculator:
             "total_co2": total
         }
 
+    @classmethod
+    def calculate_net(cls, total_co2: float, daily_offset_kg: float) -> float:
+        """Calculate net carbon footprint (total footprint minus offsets), ensuring it does not drop below 0."""
+        if total_co2 < 0:
+            raise ValueError("Total carbon footprint cannot be negative.")
+        if daily_offset_kg < 0:
+            raise ValueError("Offset amount cannot be negative.")
+        return round(max(0.0, total_co2 - daily_offset_kg), 3)
+
+
 
 class RecommendationEngine:
     """Analyzes carbon footprint patterns and outputs structured, personalized, actionable insights."""

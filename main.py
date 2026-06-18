@@ -2,7 +2,7 @@ import datetime
 import logging
 import os
 from typing import Dict, Any, List, Optional
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -22,19 +22,36 @@ app = FastAPI(
 )
 
 # Configure CORS
-# allow_credentials=False because no cookies/auth headers are used anywhere in
-# this API (user_id is just a plain request field). Wildcard origin + credentials=True
-# is an unnecessary, meaningless-for-this-app combination that browsers also reject
-# unless the server echoes back a specific origin instead of "*".
+# Restrict origins to Config.ALLOWED_ORIGINS to prevent unauthorized cross-origin requests.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=Config.ALLOWED_ORIGINS,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next) -> Response:
+    """Inject robust security HTTP headers on all API responses."""
+    response = await call_next(request)
+    csp = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data:; "
+        "connect-src 'self';"
+    )
+    response.headers["Content-Security-Policy"] = csp
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -45,33 +62,34 @@ db_repo = FirestoreRepository()
 
 # Request/Response Models
 class RouteRequest(BaseModel):
-    origin: str = Field(..., min_length=1, description="Starting location address")
-    destination: str = Field(..., min_length=1, description="Ending location address")
-    travel_mode: str = Field("car", description="Travel mode (car, bus, train, walk, bike)")
+    origin: str = Field(..., min_length=1, max_length=500, description="Starting location address")
+    destination: str = Field(..., min_length=1, max_length=500, description="Ending location address")
+    travel_mode: str = Field("car", max_length=50, description="Travel mode (car, bus, train, walk, bike)")
 
 
 class TransportLog(BaseModel):
-    distance: float = Field(..., ge=0)
-    mode: str
-    vehicle_type: Optional[str] = None
+    distance: float = Field(..., ge=0, le=100000.0)
+    mode: str = Field(..., max_length=50)
+    vehicle_type: Optional[str] = Field(None, max_length=50)
 
 
 class CarbonCalculationRequest(BaseModel):
-    user_id: str = Field(..., min_length=1)
-    electricity_kwh: float = Field(0.0, ge=0)
-    gas_m3: float = Field(0.0, ge=0)
+    user_id: str = Field(..., min_length=1, max_length=100)
+    electricity_kwh: float = Field(0.0, ge=0, le=100000.0)
+    gas_m3: float = Field(0.0, ge=0, le=100000.0)
     transport: List[TransportLog] = Field(default_factory=list)
-    diet_type: str = Field("average")
-    diet_days: int = Field(1, ge=1)
-    waste_kg: float = Field(0.0, ge=0)
+    diet_type: str = Field("average", max_length=50)
+    diet_days: int = Field(1, ge=1, le=365)
+    waste_kg: float = Field(0.0, ge=0, le=100000.0)
     waste_recycling_rate: float = Field(0.0, ge=0.0, le=1.0)
 
 
 class DailyActionRequest(BaseModel):
-    user_id: str = Field(..., min_length=1)
-    action: str = Field(...)
-    title: str = Field(...)
-    carbon_offset_kg: float = Field(..., ge=0)
+    user_id: str = Field(..., min_length=1, max_length=100)
+    action: str = Field(..., min_length=1, max_length=100)
+    title: str = Field(..., min_length=1, max_length=150)
+    carbon_offset_kg: float = Field(..., ge=0, le=100000.0)
+
 
 
 # Serve Frontend
@@ -130,6 +148,18 @@ def calculate_and_save_footprint(payload: CarbonCalculationRequest) -> Dict[str,
         inputs = payload.model_dump()
         calculations = CarbonCalculator.calculate_total(inputs)
         
+        # Calculate daily offset for today in UTC to compute net CO2
+        today_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+        actions = db_repo.get_daily_actions(payload.user_id)
+        daily_offset_kg = 0.0
+        for act in actions:
+            ts = act.get("timestamp", "")
+            if ts and ts.startswith(today_str):
+                daily_offset_kg += float(act.get("carbon_offset_kg", 0.0))
+
+        net_co2 = CarbonCalculator.calculate_net(calculations["total_co2"], daily_offset_kg)
+        calculations["net_co2"] = net_co2
+
         # Prepare log entry
         log_entry = {
             "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -139,6 +169,7 @@ def calculate_and_save_footprint(payload: CarbonCalculationRequest) -> Dict[str,
             "diet_co2": calculations["diet_co2"],
             "waste_co2": calculations["waste_co2"],
             "total_co2": calculations["total_co2"],
+            "net_co2": calculations["net_co2"],
             "inputs": {
                 "electricity_kwh": payload.electricity_kwh,
                 "gas_m3": payload.gas_m3,
@@ -165,6 +196,7 @@ def calculate_and_save_footprint(payload: CarbonCalculationRequest) -> Dict[str,
     except Exception as e:
         logger.error(f"Unexpected error in carbon calculation: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error computing carbon footprint.")
+
 
 
 @app.post("/api/action")
@@ -201,13 +233,32 @@ def get_green_actions(user_id: str = Query(..., min_length=1)) -> List[Dict[str,
 
 @app.get("/api/logs")
 def get_calculation_history(user_id: str = Query(..., min_length=1)) -> List[Dict[str, Any]]:
-    """Retrieve history of calculation logs for a user."""
+    """Retrieve history of calculation logs for a user, computing net CO2 dynamically based on daily offsets."""
     try:
         logs = db_repo.get_user_logs(user_id)
+        actions = db_repo.get_daily_actions(user_id)
+        
+        # Group offsets by day (YYYY-MM-DD)
+        offsets_by_day = {}
+        for act in actions:
+            ts = act.get("timestamp", "")
+            if ts:
+                day = ts[:10]
+                offsets_by_day[day] = offsets_by_day.get(day, 0.0) + float(act.get("carbon_offset_kg", 0.0))
+                
+        # Inject net_co2 into logs dynamically
+        for log in logs:
+            total_co2 = float(log.get("total_co2", 0.0))
+            ts = log.get("timestamp", "")
+            day = ts[:10] if ts else ""
+            offset_kg = offsets_by_day.get(day, 0.0)
+            log["net_co2"] = CarbonCalculator.calculate_net(total_co2, offset_kg)
+            
         return logs
     except Exception as e:
         logger.error(f"Error fetching user logs: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal database retrieval error.")
+
 
 
 @app.delete("/api/logs")
