@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pydantic
+requests
+
+# Optional — only needed if you want real Firestore instead of the local JSON
+# DB fallback. Adds real time to Render's free-tier build. Skip for now;
+# the app already degrades gracefully without these.
+# firebase-admin
+# google-cloud-firestore

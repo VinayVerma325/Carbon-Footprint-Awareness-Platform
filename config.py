@@ -65,7 +65,9 @@ class Config:
             os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _abs_path
 
     # Server configuration
-    HOST: str = os.getenv("HOST", "127.0.0.1")
+    # 0.0.0.0 (not 127.0.0.1): binds all interfaces. Required for Render/Railway/any
+    # cloud host to reach this process at all; still works fine for local dev too.
+    HOST: str = os.getenv("HOST", "0.0.0.0")
     PORT: int = int(os.getenv("PORT", "8000"))
     
     # Local fallback file database path
