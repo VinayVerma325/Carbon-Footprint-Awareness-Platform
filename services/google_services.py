@@ -232,6 +232,26 @@ class FirestoreRepository:
             logger.error(f"Local DB fallback failed: {str(local_err)}")
             return []
 
+    def clear_user_logs(self, user_id: str) -> bool:
+        """Clear all carbon calculation logs for a user."""
+        try:
+            if not self.use_fallback and self.db:
+                docs = self.db.collection("users").document(user_id).collection("logs").stream()
+                for doc in docs:
+                    doc.reference.delete()
+        except Exception as e:
+            logger.error(f"Error clearing user logs from Firestore: {str(e)}. Falling back to local DB.")
+
+        try:
+            db_data = self._read_local_db()
+            if user_id in db_data["logs"]:
+                db_data["logs"][user_id] = []
+                self._write_local_db(db_data)
+            return True
+        except Exception as local_err:
+            logger.error(f"Local DB fallback failed: {str(local_err)}")
+            return False
+
     def save_daily_action(self, user_id: str, action_data: Dict[str, Any]) -> bool:
         """Save a daily action completed by the user (green habit)."""
         try:

@@ -562,6 +562,42 @@ input:focus, select:focus {
     margin-bottom: 1rem;
 }
 
+.history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.history-header h3 {
+    margin-bottom: 0;
+}
+
+.history-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.history-toggle-btn,
+.history-clear-btn {
+    padding: 0.4rem 0.85rem;
+    font-size: 0.8rem;
+    border-radius: 8px;
+}
+
+.history-clear-btn {
+    color: var(--danger);
+    border-color: rgba(239, 68, 68, 0.2);
+}
+
+.history-clear-btn:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.4);
+}
+
 .table-wrapper {
     overflow-x: auto;
     background: rgba(0, 0, 0, 0.15);

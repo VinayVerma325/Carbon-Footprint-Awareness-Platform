@@ -340,7 +340,16 @@
             </div>
 
             <div class="logs-history-box">
-                <h3>Calculation History</h3>
+                <div class="history-header">
+                    <h3>Calculation History</h3>
+                    <div class="history-actions">
+                        <button type="button" class="btn secondary-btn history-toggle-btn" id="toggle-history-btn" title="Show all history">Show All</button>
+                        <button type="button" class="btn secondary-btn history-clear-btn" id="clear-history-btn" title="Clear all saved history">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            Clear
+                        </button>
+                    </div>
+                </div>
                 <div class="table-wrapper">
                     <table class="history-table" id="history-table">
                         <thead>
@@ -377,6 +386,7 @@
         const USER_ID = "demo_user_123";
         let latestCalculations = null;
         let isFetchingRoute = false;
+        let showAllHistory = false;
 
         // API endpoint helper — always same-origin, served by our own FastAPI
         // backend. No client-side Google Maps key, no user-configurable backend
@@ -979,21 +989,38 @@
             }
 
             if (logsData.length > 0) {
+                // Filter to today's logs only, unless "Show All" is toggled
+                let displayLogs = logsData;
+                if (!showAllHistory) {
+                    const todayStr = new Date().toISOString().slice(0, 10);
+                    displayLogs = logsData.filter(log => {
+                        try {
+                            return log.timestamp && log.timestamp.slice(0, 10) === todayStr;
+                        } catch(e) { return false; }
+                    });
+                }
+
                 // Render history table
                 historyTbody.innerHTML = "";
-                logsData.slice().reverse().forEach(log => {
-                    const dateStr = new Date(log.timestamp).toLocaleString();
+                if (displayLogs.length === 0) {
                     const tr = document.createElement("tr");
-                    tr.innerHTML = `
-                        <td>${dateStr}</td>
-                        <td><strong>${log.total_co2.toFixed(2)} kg</strong></td>
-                        <td>${(log.electricity_co2 + log.gas_co2).toFixed(2)} kg</td>
-                        <td>${log.transport_co2.toFixed(2)} kg</td>
-                        <td>${log.diet_co2.toFixed(2)} kg</td>
-                        <td>${log.waste_co2.toFixed(2)} kg</td>
-                    `;
+                    tr.innerHTML = `<td colspan="6" class="empty-table">No logs for today. Submit a daily log to start tracking.</td>`;
                     historyTbody.appendChild(tr);
-                });
+                } else {
+                    displayLogs.slice().reverse().forEach(log => {
+                        const dateStr = new Date(log.timestamp).toLocaleString();
+                        const tr = document.createElement("tr");
+                        tr.innerHTML = `
+                            <td>${dateStr}</td>
+                            <td><strong>${log.total_co2.toFixed(2)} kg</strong></td>
+                            <td>${(log.electricity_co2 + log.gas_co2).toFixed(2)} kg</td>
+                            <td>${log.transport_co2.toFixed(2)} kg</td>
+                            <td>${log.diet_co2.toFixed(2)} kg</td>
+                            <td>${log.waste_co2.toFixed(2)} kg</td>
+                        `;
+                        historyTbody.appendChild(tr);
+                    });
+                }
 
                 // Update metrics KPI with the most recent log
                 const latest = logsData[logsData.length - 1];
@@ -1234,6 +1261,40 @@
             } else {
                 document.body.classList.remove("compact-mode");
             }
+        }
+
+        // Toggle History (Today vs All)
+        const toggleHistoryBtn = document.getElementById("toggle-history-btn");
+        if (toggleHistoryBtn) {
+            toggleHistoryBtn.addEventListener("click", async () => {
+                showAllHistory = !showAllHistory;
+                toggleHistoryBtn.textContent = showAllHistory ? "Today Only" : "Show All";
+                await fetchDashboardState();
+            });
+        }
+
+        // Clear History
+        const clearHistoryBtn = document.getElementById("clear-history-btn");
+        if (clearHistoryBtn) {
+            clearHistoryBtn.addEventListener("click", async () => {
+                if (!confirm("Are you sure you want to clear all calculation history? This cannot be undone.")) return;
+
+                // Clear server-side logs
+                try {
+                    await fetch(getApiUrl(`/api/logs?user_id=${USER_ID}`), { method: "DELETE" });
+                } catch (err) {
+                    console.warn("Backend DELETE /api/logs not reachable.", err);
+                }
+
+                // Clear client-side logs
+                localStorage.removeItem("carbonwise_logs");
+                localStorage.removeItem("carbonwise_actions");
+
+                // Reset UI
+                historyTbody.innerHTML = `<tr><td colspan="6" class="empty-table">No calculation history available. Log a footprint to populate.</td></tr>`;
+                announceToScreenReader("All calculation history has been cleared.");
+                await fetchDashboardState();
+            });
         }
 
         // Initial setup on load

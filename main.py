@@ -182,6 +182,21 @@ def get_calculation_history(user_id: str = Query(..., min_length=1)):
         raise HTTPException(status_code=500, detail="Internal database retrieval error.")
 
 
+@app.delete("/api/logs")
+def clear_calculation_history(user_id: str = Query(..., min_length=1)):
+    """Clear all calculation logs for a user."""
+    try:
+        cleared = db_repo.clear_user_logs(user_id)
+        if not cleared:
+            raise HTTPException(status_code=500, detail="Failed to clear user logs.")
+        return {"status": "success", "message": "All calculation history cleared."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error clearing user logs: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal database error.")
+
+
 @app.get("/api/recommendations")
 def get_personalized_recommendations(user_id: str = Query(..., min_length=1)):
     """Analyze database logs to generate structured, personalized insights for the user."""
