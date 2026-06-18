@@ -640,26 +640,145 @@ div[tabindex="0"]:focus-visible {
 
 /* Responsive Breakpoints */
 @media (max-width: 1024px) {
-    .summary-card {
-        grid-column: span 12;
+    body {
+        padding: 1.5rem 1rem;
+        gap: 1.5rem;
     }
-    .appearance-card {
-        grid-column: span 12;
-    }
+    .summary-card,
+    .appearance-card,
     .tracking-card {
         grid-column: span 12;
+    }
+    .card {
+        padding: 1.75rem;
     }
 }
 
 @media (max-width: 768px) {
+    .logo-area h1 {
+        font-size: 2rem;
+    }
+    .tagline {
+        font-size: 1rem;
+    }
+    .card {
+        padding: 1.5rem;
+        border-radius: 16px;
+    }
     .recommendations-list {
         grid-template-columns: 1fr;
     }
     .action-buttons-grid {
         grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
     }
     .route-inputs {
         grid-template-columns: 1fr;
+    }
+    .kpi-container {
+        gap: 1.5rem;
+    }
+    .history-table th, 
+    .history-table td {
+        padding: 0.6rem 0.8rem;
+        font-size: 0.85rem;
+    }
+}
+
+@media (max-width: 580px) {
+    body {
+        padding: 1rem 0.5rem;
+        gap: 1rem;
+    }
+    .logo-area h1 {
+        font-size: 1.75rem;
+    }
+    .logo-icon {
+        width: 1.85rem;
+        height: 1.85rem;
+    }
+    .card {
+        padding: 1.25rem 1rem;
+        border-radius: 14px;
+    }
+    .card h2 {
+        font-size: 1.25rem;
+        margin-bottom: 1.25rem;
+    }
+    .kpi-container {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 1.25rem;
+    }
+    .progress-ring-wrapper {
+        width: 140px;
+        height: 140px;
+    }
+    .progress-ring {
+        width: 140px;
+        height: 140px;
+    }
+    .progress-ring__circle,
+    .progress-ring__background {
+        r: 60;
+        cx: 70;
+        cy: 70;
+        stroke-width: 10;
+    }
+    .progress-ring__circle {
+        stroke-dasharray: 376.99;
+        stroke-dashoffset: 376.99;
+    }
+    .co2-value {
+        font-size: 1.75rem;
+    }
+    .metrics-breakdown {
+        width: 100%;
+    }
+    .tab-list {
+        margin-bottom: 1.25rem;
+        padding: 0.15rem;
+        gap: 0.25rem;
+    }
+    .tab-btn {
+        padding: 0.5rem 0.25rem;
+        font-size: 0.8rem;
+        border-radius: 8px;
+    }
+    .action-buttons-grid {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+    .action-btn {
+        flex-direction: row;
+        text-align: left;
+        padding: 0.75rem;
+        gap: 0.75rem;
+        justify-content: flex-start;
+    }
+    .action-btn .icon {
+        font-size: 1.25rem;
+        flex-shrink: 0;
+    }
+    .action-btn .title {
+        font-size: 0.85rem;
+        flex-grow: 1;
+    }
+    .action-btn .saving {
+        font-size: 0.85rem;
+        white-space: nowrap;
+    }
+    .form-actions {
+        flex-direction: column;
+        gap: 0.75rem;
+        width: 100%;
+    }
+    .form-actions .btn {
+        width: 100%;
+    }
+    .route-calculator-box {
+        padding: 1rem;
     }
 }
 
