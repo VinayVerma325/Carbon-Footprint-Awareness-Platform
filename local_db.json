@@ -944,6 +944,50 @@
                     "waste_recycling_rate": 0.3
                 }
             }
+        ],
+        "test_user_api": [
+            {
+                "timestamp": "2026-06-18T18:20:10.579141+00:00",
+                "electricity_co2": 3.85,
+                "gas_co2": 4.06,
+                "transport_co2": 3.0,
+                "diet_co2": 4.7,
+                "waste_co2": 0.55,
+                "total_co2": 16.16,
+                "inputs": {
+                    "electricity_kwh": 10.0,
+                    "gas_m3": 2.0,
+                    "transport": [
+                        {
+                            "distance": 15.0,
+                            "mode": "car",
+                            "vehicle_type": "hybrid"
+                        }
+                    ],
+                    "diet_type": "vegetarian",
+                    "waste_kg": 2.0,
+                    "waste_recycling_rate": 0.5
+                }
+            }
+        ],
+        "test_user_logs": [
+            {
+                "timestamp": "2026-06-18T18:20:10.611187+00:00",
+                "electricity_co2": 1.925,
+                "gas_co2": 0.0,
+                "transport_co2": 0.0,
+                "diet_co2": 4.1,
+                "waste_co2": 0.0,
+                "total_co2": 6.025,
+                "inputs": {
+                    "electricity_kwh": 5.0,
+                    "gas_m3": 0.0,
+                    "transport": [],
+                    "diet_type": "vegan",
+                    "waste_kg": 0.0,
+                    "waste_recycling_rate": 0.0
+                }
+            }
         ]
     },
     "actions": {
@@ -983,6 +1027,14 @@
                 "title": "Diverted Waste",
                 "carbon_offset_kg": 0.3,
                 "timestamp": "2026-06-17T12:11:39.096155+00:00"
+            }
+        ],
+        "test_user_action": [
+            {
+                "action": "meatless_meal",
+                "title": "Meatless Meal",
+                "carbon_offset_kg": 1.2,
+                "timestamp": "2026-06-18T18:20:10.560822+00:00"
             }
         ]
     },

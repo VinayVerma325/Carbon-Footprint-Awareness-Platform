@@ -19,6 +19,9 @@ class CarbonCalculator:
         "train": 0.050,
         "flight_short": 0.250,  # < 300 miles
         "flight_long": 0.150,   # >= 300 miles
+        "bicycle": 0.0,
+        "bike": 0.0,
+        "walk": 0.0,
     }
     
     # Diet emission factors (kg CO2 per day)

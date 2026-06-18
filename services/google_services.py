@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import requests
+import threading
 from typing import Dict, Any, List, Optional
 from config import Config
 
@@ -131,7 +132,6 @@ class RoutesServiceClient:
             "source": "simulated_fallback"
         }
 
-
 class FirestoreRepository:
     """Repository managing Firebase Firestore connectivity. Gracefully falls back to local file storage."""
 
@@ -139,6 +139,7 @@ class FirestoreRepository:
         self.db = None
         self.local_db_path = Config.LOCAL_DB_PATH
         self.use_fallback = True
+        self._lock = threading.RLock()
 
         if FIRESTORE_AVAILABLE:
             try:
@@ -182,20 +183,22 @@ class FirestoreRepository:
 
     def _read_local_db(self) -> Dict[str, Any]:
         """Read data from local DB."""
-        try:
-            with open(self.local_db_path, "r") as f:
-                return json.load(f)
-        except Exception as e:
-            logger.error(f"Error reading local database: {str(e)}")
-            return {"logs": {}, "actions": {}, "profiles": {}}
+        with self._lock:
+            try:
+                with open(self.local_db_path, "r") as f:
+                    return json.load(f)
+            except Exception as e:
+                logger.error(f"Error reading local database: {str(e)}")
+                return {"logs": {}, "actions": {}, "profiles": {}}
 
     def _write_local_db(self, data: Dict[str, Any]) -> None:
         """Write data to local DB."""
-        try:
-            with open(self.local_db_path, "w") as f:
-                json.dump(data, f, indent=4)
-        except Exception as e:
-            logger.error(f"Error writing local database: {str(e)}")
+        with self._lock:
+            try:
+                with open(self.local_db_path, "w") as f:
+                    json.dump(data, f, indent=4)
+            except Exception as e:
+                logger.error(f"Error writing local database: {str(e)}")
 
     def save_user_log(self, user_id: str, log_data: Dict[str, Any]) -> bool:
         """Save a new carbon calculation log for a user."""
@@ -207,11 +210,12 @@ class FirestoreRepository:
             logger.error(f"Error saving user log to Firestore: {str(e)}. Falling back to local DB.")
             
         try:
-            db_data = self._read_local_db()
-            user_logs = db_data["logs"].setdefault(user_id, [])
-            user_logs.append(log_data)
-            self._write_local_db(db_data)
-            return True
+            with self._lock:
+                db_data = self._read_local_db()
+                user_logs = db_data["logs"].setdefault(user_id, [])
+                user_logs.append(log_data)
+                self._write_local_db(db_data)
+                return True
         except Exception as local_err:
             logger.error(f"Local DB fallback failed: {str(local_err)}")
             return False
@@ -226,8 +230,9 @@ class FirestoreRepository:
             logger.error(f"Error getting user logs from Firestore: {str(e)}. Falling back to local DB.")
             
         try:
-            db_data = self._read_local_db()
-            return db_data["logs"].get(user_id, [])
+            with self._lock:
+                db_data = self._read_local_db()
+                return db_data["logs"].get(user_id, [])
         except Exception as local_err:
             logger.error(f"Local DB fallback failed: {str(local_err)}")
             return []
@@ -243,11 +248,12 @@ class FirestoreRepository:
             logger.error(f"Error clearing user logs from Firestore: {str(e)}. Falling back to local DB.")
 
         try:
-            db_data = self._read_local_db()
-            if user_id in db_data["logs"]:
-                db_data["logs"][user_id] = []
-                self._write_local_db(db_data)
-            return True
+            with self._lock:
+                db_data = self._read_local_db()
+                if user_id in db_data["logs"]:
+                    db_data["logs"][user_id] = []
+                    self._write_local_db(db_data)
+                return True
         except Exception as local_err:
             logger.error(f"Local DB fallback failed: {str(local_err)}")
             return False
@@ -262,11 +268,12 @@ class FirestoreRepository:
             logger.error(f"Error saving daily action to Firestore: {str(e)}. Falling back to local DB.")
             
         try:
-            db_data = self._read_local_db()
-            user_actions = db_data["actions"].setdefault(user_id, [])
-            user_actions.append(action_data)
-            self._write_local_db(db_data)
-            return True
+            with self._lock:
+                db_data = self._read_local_db()
+                user_actions = db_data["actions"].setdefault(user_id, [])
+                user_actions.append(action_data)
+                self._write_local_db(db_data)
+                return True
         except Exception as local_err:
             logger.error(f"Local DB fallback failed: {str(local_err)}")
             return False
@@ -281,8 +288,9 @@ class FirestoreRepository:
             logger.error(f"Error getting daily actions from Firestore: {str(e)}. Falling back to local DB.")
             
         try:
-            db_data = self._read_local_db()
-            return db_data["actions"].get(user_id, [])
+            with self._lock:
+                db_data = self._read_local_db()
+                return db_data["actions"].get(user_id, [])
         except Exception as local_err:
             logger.error(f"Local DB fallback failed: {str(local_err)}")
             return []
@@ -297,10 +305,11 @@ class FirestoreRepository:
             logger.error(f"Error saving user profile to Firestore: {str(e)}. Falling back to local DB.")
             
         try:
-            db_data = self._read_local_db()
-            db_data["profiles"][user_id] = profile_data
-            self._write_local_db(db_data)
-            return True
+            with self._lock:
+                db_data = self._read_local_db()
+                db_data["profiles"][user_id] = profile_data
+                self._write_local_db(db_data)
+                return True
         except Exception as local_err:
             logger.error(f"Local DB fallback failed: {str(local_err)}")
             return False
@@ -316,8 +325,9 @@ class FirestoreRepository:
             logger.error(f"Error getting user profile from Firestore: {str(e)}. Falling back to local DB.")
             
         try:
-            db_data = self._read_local_db()
-            return db_data["profiles"].get(user_id, {})
+            with self._lock:
+                db_data = self._read_local_db()
+                return db_data["profiles"].get(user_id, {})
         except Exception as local_err:
             logger.error(f"Local DB fallback failed: {str(local_err)}")
             return {}

@@ -190,6 +190,7 @@
                             <option value="bus">Public Bus</option>
                             <option value="train">Train / Metro</option>
                             <option value="motorcycle">Motorcycle</option>
+                            <option value="flight">Flight</option>
                             <option value="bicycle">Bicycle (0 emissions)</option>
                             <option value="walk">Walking (0 emissions)</option>
                         </select>
@@ -433,6 +434,9 @@
                 train: 0.050,
                 flight_short: 0.250,
                 flight_long: 0.150,
+                bicycle: 0.0,
+                bike: 0.0,
+                walk: 0.0,
             },
             DIET_FACTORS: {
                 heavy_meat: 9.0,
@@ -969,24 +973,23 @@
             targetAssessment.innerHTML = assessment;
         }
 
-        // Fetch user history & recommendations
+        // Fetch user history & recommendations in parallel
         async function fetchDashboardState() {
-            let logsData = [];
-            let logsOk = false;
-            try {
-                // Fetch Logs History
-                const logsResponse = await fetch(getApiUrl(`/api/logs?user_id=${USER_ID}`));
-                if (logsResponse.ok) {
-                    logsData = await logsResponse.json();
-                    logsOk = true;
-                }
-            } catch (err) {
-                console.warn("Backend API `/api/logs` not reachable. Using localStorage.", err);
-            }
+            const logsPromise = fetch(getApiUrl(`/api/logs?user_id=${USER_ID}`))
+                .then(r => r.ok ? r.json() : Promise.reject())
+                .catch(() => {
+                    console.warn("Backend API `/api/logs` not reachable. Using localStorage.");
+                    return LocalDatabase.getLogs();
+                });
 
-            if (!logsOk) {
-                logsData = LocalDatabase.getLogs();
-            }
+            const recsPromise = fetch(getApiUrl(`/api/recommendations?user_id=${USER_ID}`))
+                .then(r => r.ok ? r.json() : Promise.reject())
+                .catch(() => {
+                    console.warn("Backend API `/api/recommendations` not reachable. Using client-side logic.");
+                    return null;
+                });
+
+            const [logsData, serverRecsData] = await Promise.all([logsPromise, recsPromise]);
 
             if (logsData.length > 0) {
                 // Filter to today's logs only, unless "Show All" is toggled
@@ -1027,20 +1030,8 @@
                 updateKPIs(latest);
             }
 
-            let recsData = [];
-            let recsOk = false;
-            try {
-                // Fetch recommendations
-                const recsResponse = await fetch(getApiUrl(`/api/recommendations?user_id=${USER_ID}`));
-                if (recsResponse.ok) {
-                    recsData = await recsResponse.json();
-                    recsOk = true;
-                }
-            } catch (err) {
-                console.warn("Backend API `/api/recommendations` not reachable. Using client-side logic.", err);
-            }
-
-            if (!recsOk) {
+            let recsData = serverRecsData;
+            if (!recsData) {
                 const defaultInputs = {
                     electricity_kwh: 5.0,
                     gas_m3: 0.0,
@@ -1049,12 +1040,12 @@
                     waste_kg: 1.5,
                     waste_recycling_rate: 0.3
                 };
-                const latestLog = logsData[logsData.length - 1];
+                const latestLog = logsData.length > 0 ? logsData[logsData.length - 1] : null;
                 const inputData = latestLog ? latestLog.inputs : defaultInputs;
                 recsData = RecommendationEngine.analyzeAndRecommend(inputData, logsData);
             }
 
-            if (recsData.length > 0) {
+            if (recsData && recsData.length > 0) {
                 recommendationsContainer.innerHTML = "";
                 recsData.forEach(rec => {
                     const card = document.createElement("div");

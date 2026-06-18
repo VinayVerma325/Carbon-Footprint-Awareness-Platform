@@ -11,6 +11,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from core.calculator import CarbonCalculator, RecommendationEngine
 from services.google_services import RoutesServiceClient, FirestoreRepository
 from config import Config
+from fastapi.testclient import TestClient
+from main import app
 
 
 class TestCarbonCalculator(unittest.TestCase):
@@ -50,6 +52,12 @@ class TestCarbonCalculator(unittest.TestCase):
         
         # Flight long (>=300 miles): 500 miles * 0.150 = 75.00 kg CO2
         self.assertEqual(CarbonCalculator.calculate_transport(500.0, "flight"), 75.00)
+        
+        # Bicycle: 10 miles * 0.0 = 0.0 kg CO2
+        self.assertEqual(CarbonCalculator.calculate_transport(10.0, "bicycle"), 0.0)
+        
+        # Walk: 5 miles * 0.0 = 0.0 kg CO2
+        self.assertEqual(CarbonCalculator.calculate_transport(5.0, "walk"), 0.0)
 
         with self.assertRaises(ValueError):
             CarbonCalculator.calculate_transport(-20.0, "car")
@@ -95,22 +103,16 @@ class TestCarbonCalculator(unittest.TestCase):
         # electricity: 10 * 0.385 = 3.85
         # gas: 2 * 2.03 = 4.06
         # transport 1: 15 * 0.200 = 3.00
-        # transport 2: 5 * 0.404 = 2.02 (walk maps to petrol car fallback or bicycle? Actually, walk mode in TRANSPORT_FACTORS is not there, so it falls back to petrol car fallback unless defined. Wait! In core/calculator.py, walk/bicycle factor isn't directly defined, so let's verify what happens. It returns petrol_car fallback. Wait, let's look: factor = cls.TRANSPORT_FACTORS.get(factor_key, cls.TRANSPORT_FACTORS["petrol_car"]). Yes. If we pass mode="walk", factor_key="walk" is not in TRANSPORT_FACTORS, so it falls back to petrol_car 0.404. Let's fix that or check. Oh, yes, in calculator.py:
-        #   "electric_vehicle": 0.050,
-        #   "motorcycle": 0.180,
-        #   "bus": 0.100,
-        #   "train": 0.050,
-        # In our calculator.py, we did not define walk/bicycle as 0, but they should be! In transport_mode mapping in JS we set them. Let's make sure our test assertions match what calculator does. Or we can patch calculator.py if needed, or we just write the test accordingly.
-        # Let's see: for mode="walk", calculator uses factor_key="walk". Since "walk" is not in TRANSPORT_FACTORS, it falls back to "petrol_car" (0.404). Wait! We should verify if that is correct. Let's look: transport 2: 5 * 0.404 = 2.02.
+        # transport 2: 5 * 0.0 = 0.0 (walk is zero-emission mode)
         # diet: 1 * 4.7 (vegetarian) = 4.7
         # waste: 2 kg, 0.5 recycling (1kg landfill * 0.5 + 1kg recycle * 0.05 = 0.55)
-        # total = 3.85 + 4.06 + 3.00 + 2.02 + 4.7 + 0.55 = 18.18
+        # total = 3.85 + 4.06 + 3.00 + 0.0 + 4.7 + 0.55 = 16.16
         res = CarbonCalculator.calculate_total(inputs)
         self.assertEqual(res["electricity_co2"], 3.85)
         self.assertEqual(res["gas_co2"], 4.06)
         self.assertEqual(res["diet_co2"], 4.7)
         self.assertEqual(res["waste_co2"], 0.55)
-        self.assertEqual(res["total_co2"], 18.18)
+        self.assertEqual(res["total_co2"], 16.16)
 
 
 class TestRecommendationEngine(unittest.TestCase):
@@ -269,6 +271,74 @@ class TestFirestoreRepository(unittest.TestCase):
                     actions = repo.get_daily_actions("user_fallback_test")
                     self.assertEqual(len(actions), 1)
                     self.assertEqual(actions[0]["action"], "walk")
+
+
+class TestAPIEndpoints(unittest.TestCase):
+    """Integration tests for the FastAPI routes."""
+
+    def setUp(self) -> None:
+        self.client = TestClient(app)
+        self.temp_db_path = "test_endpoint_db.json"
+        Config.LOCAL_DB_PATH = self.temp_db_path
+        # Force fallback database mode
+        self.firestore_patcher = patch("services.google_services.FIRESTORE_AVAILABLE", False)
+        self.firestore_patcher.start()
+
+    def tearDown(self) -> None:
+        self.firestore_patcher.stop()
+        if os.path.exists(self.temp_db_path):
+            os.remove(self.temp_db_path)
+
+    def test_calculate_endpoint(self) -> None:
+        payload = {
+            "user_id": "test_user_api",
+            "electricity_kwh": 10.0,
+            "gas_m3": 2.0,
+            "transport": [
+                {"distance": 15.0, "mode": "car", "vehicle_type": "hybrid"}
+            ],
+            "diet_type": "vegetarian",
+            "diet_days": 1,
+            "waste_kg": 2.0,
+            "waste_recycling_rate": 0.5
+        }
+        response = self.client.post("/api/calculate", json=payload)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "success")
+        self.assertEqual(data["calculations"]["total_co2"], 16.16)
+
+    def test_logs_endpoint(self) -> None:
+        # First save a log
+        payload = {
+            "user_id": "test_user_logs",
+            "electricity_kwh": 5.0,
+            "gas_m3": 0.0,
+            "transport": [],
+            "diet_type": "vegan",
+            "diet_days": 1,
+            "waste_kg": 0.0,
+            "waste_recycling_rate": 0.0
+        }
+        self.client.post("/api/calculate", json=payload)
+
+        # Retrieve logs
+        response = self.client.get("/api/logs?user_id=test_user_logs")
+        self.assertEqual(response.status_code, 200)
+        logs = response.json()
+        self.assertEqual(len(logs), 1)
+        self.assertEqual(logs[0]["total_co2"], 6.025)  # 5*0.385 + 4.1 = 1.925 + 4.1 = 6.025
+
+    def test_action_endpoint(self) -> None:
+        payload = {
+            "user_id": "test_user_action",
+            "action": "meatless_meal",
+            "title": "Meatless Meal",
+            "carbon_offset_kg": 1.2
+        }
+        response = self.client.post("/api/action", json=payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "success")
 
 
 if __name__ == "__main__":

@@ -9,8 +9,8 @@ from pydantic import BaseModel, Field
 from config import Config
 from core.calculator import CarbonCalculator, RecommendationEngine
 from services.google_services import RoutesServiceClient, FirestoreRepository
-
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 # Setup logging
 logger = logging.getLogger("CarbonPlatformServer")
@@ -33,6 +33,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -76,14 +78,20 @@ class DailyActionRequest(BaseModel):
 @app.get("/")
 def read_root():
     """Serve the primary dashboard interface."""
-    return FileResponse(os.path.join(BASE_DIR, "index.html"))
+    return FileResponse(
+        os.path.join(BASE_DIR, "index.html"),
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+    )
 
 
 @app.get("/style.css")
 @app.get("/app.css")
 def read_css():
-    """Serve dashboard styling stylesheet."""
-    return FileResponse(os.path.join(BASE_DIR, "style.css"))
+    """Serve dashboard styling stylesheet with caching enabled for efficiency."""
+    return FileResponse(
+        os.path.join(BASE_DIR, "style.css"),
+        headers={"Cache-Control": "public, max-age=31536000"}  # cache for 1 year
+    )
 
 
 # API Endpoints
