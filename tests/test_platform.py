@@ -280,12 +280,22 @@ class TestAPIEndpoints(unittest.TestCase):
         self.client = TestClient(app)
         self.temp_db_path = "test_endpoint_db.json"
         Config.LOCAL_DB_PATH = self.temp_db_path
+        
+        # Patch the instantiated repository path in main app to use temp db
+        from main import db_repo
+        self.original_db_path = db_repo.local_db_path
+        db_repo.local_db_path = self.temp_db_path
+        db_repo.use_fallback = True
+        db_repo._init_local_db()
+        
         # Force fallback database mode
         self.firestore_patcher = patch("services.google_services.FIRESTORE_AVAILABLE", False)
         self.firestore_patcher.start()
 
     def tearDown(self) -> None:
         self.firestore_patcher.stop()
+        from main import db_repo
+        db_repo.local_db_path = self.original_db_path
         if os.path.exists(self.temp_db_path):
             os.remove(self.temp_db_path)
 

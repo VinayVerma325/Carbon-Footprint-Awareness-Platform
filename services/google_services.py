@@ -151,9 +151,26 @@ class FirestoreRepository:
                         firebase_admin.initialize_app(cred)
                         logger.info("Firebase Admin initialized via JSON credentials env variable.")
                     elif Config.GOOGLE_APPLICATION_CREDENTIALS:
-                        cred = credentials.Certificate(Config.GOOGLE_APPLICATION_CREDENTIALS)
-                        firebase_admin.initialize_app(cred)
-                        logger.info("Firebase Admin initialized via Google Application Credentials file.")
+                        # Ensure it's a valid service account cert, not a placeholder
+                        is_valid_cert = False
+                        try:
+                            if os.path.exists(Config.GOOGLE_APPLICATION_CREDENTIALS):
+                                with open(Config.GOOGLE_APPLICATION_CREDENTIALS, 'r') as f:
+                                    cert_data = json.load(f)
+                                    if cert_data and cert_data.get("type") == "service_account":
+                                        is_valid_cert = True
+                        except Exception:
+                            pass
+                        
+                        if is_valid_cert:
+                            cred = credentials.Certificate(Config.GOOGLE_APPLICATION_CREDENTIALS)
+                            firebase_admin.initialize_app(cred)
+                            logger.info("Firebase Admin initialized via Google Application Credentials file.")
+                        elif Config.FIREBASE_PROJECT_ID:
+                            firebase_admin.initialize_app(options={"projectId": Config.FIREBASE_PROJECT_ID})
+                            logger.info("Firebase Admin initialized with Project ID.")
+                        else:
+                            raise ValueError("Google Application Credentials file is an invalid placeholder and no Project ID was configured.")
                     elif Config.FIREBASE_PROJECT_ID:
                         firebase_admin.initialize_app(options={"projectId": Config.FIREBASE_PROJECT_ID})
                         logger.info("Firebase Admin initialized with Project ID.")
