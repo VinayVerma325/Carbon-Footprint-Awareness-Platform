@@ -17,7 +17,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            <span>Settings & Style</span>
+            <span>Appearance</span>
         </button>
         <div id="appearance-dropdown" class="appearance-dropdown-menu" hidden aria-hidden="true">
             <div class="appearance-settings">
@@ -71,20 +71,6 @@
                         <input type="checkbox" id="compact-toggle" role="switch">
                         <span class="toggle-slider"></span>
                     </label>
-                </div>
-
-                <!-- API Configuration -->
-                <div class="setting-separator"></div>
-                <div class="setting-row">
-                    <span class="setting-label">API Configuration</span>
-                    <div class="form-group-compact" style="margin-top: 0.25rem;">
-                        <label for="settings-api-key">Google Maps API Key</label>
-                        <input type="password" id="settings-api-key" placeholder="AIzaSy...">
-                    </div>
-                    <div class="form-group-compact" style="margin-top: 0.5rem;">
-                        <label for="settings-backend-url">Backend Server URL</label>
-                        <input type="text" id="settings-backend-url" placeholder="e.g. https://api.yoursite.com">
-                    </div>
                 </div>
             </div>
         </div>
@@ -799,31 +785,29 @@
                 let data;
                 let responseOk = false;
                 
-                // 1. Try configured/local backend first
+                // 1. Force direct client-side Google API call with the pre-integrated API key
+                const clientApiKey = "AIzaSyBMSXnLgET1t5XOfXzFTFaeRktafqcDbdM";
                 try {
-                    const response = await fetch(getApiUrl("/api/route"), {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ origin, destination, travel_mode: mode })
-                    });
-                    if (response.ok) {
-                        data = await response.json();
-                        responseOk = true;
-                    }
-                } catch (fetchErr) {
-                    console.warn("Backend API not reachable.", fetchErr);
+                    data = await calculateRouteDirectly(origin, destination, mode, clientApiKey);
+                    responseOk = true;
+                } catch (directErr) {
+                    console.error("Direct Google API route calculation failed:", directErr);
                 }
 
-                // 2. Try direct client-side Google API call if client-side API Key is provided
+                // 2. Try configured/local backend as fallback
                 if (!responseOk) {
-                    const clientApiKey = localStorage.getItem("carbonwise_google_maps_api_key") || "AIzaSyBMSXnLgET1t5XOfXzFTFaeRktafqcDbdM";
-                    if (clientApiKey) {
-                        try {
-                            data = await calculateRouteDirectly(origin, destination, mode, clientApiKey);
+                    try {
+                        const response = await fetch(getApiUrl("/api/route"), {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ origin, destination, travel_mode: mode })
+                        });
+                        if (response.ok) {
+                            data = await response.json();
                             responseOk = true;
-                        } catch (directErr) {
-                            console.error("Direct Google API route calculation failed:", directErr);
                         }
+                    } catch (fetchErr) {
+                        console.warn("Backend API not reachable.", fetchErr);
                     }
                 }
 
@@ -1355,24 +1339,6 @@
 
         // Initial setup on load
         window.addEventListener("DOMContentLoaded", async () => {
-            // Bind settings inputs
-            const apiKeyInput = document.getElementById("settings-api-key");
-            const backendUrlInput = document.getElementById("settings-backend-url");
-
-            if (apiKeyInput) {
-                apiKeyInput.value = savedApiKey;
-                apiKeyInput.addEventListener("input", () => {
-                    localStorage.setItem("carbonwise_google_maps_api_key", apiKeyInput.value.trim());
-                });
-            }
-
-            if (backendUrlInput) {
-                backendUrlInput.value = savedBackendUrl;
-                backendUrlInput.addEventListener("input", () => {
-                    localStorage.setItem("carbonwise_backend_url", backendUrlInput.value.trim());
-                });
-            }
-
             // Setup default values
             updateKPIs({
                 electricity_co2: 1.92,
