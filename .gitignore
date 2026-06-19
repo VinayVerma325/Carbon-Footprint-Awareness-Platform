@@ -1,11 +1,20 @@
+# Secrets and credentials — NEVER commit these
 .env
 service-account.json
+
+# Python bytecode and caches
 __pycache__/
 *.pyc
+*.pyo
 .pytest_cache/
+*.egg-info/
+dist/
+build/
 
 # Local databases and dynamic logs
 local_db.json
+test_local_db.json
+test_endpoint_db.json
 
 # Virtual environments
 .venv/
@@ -15,7 +24,14 @@ env/
 # IDE configurations
 .vscode/
 .idea/
+*.swp
+*.swo
 
 # System files
 .DS_Store
 Thumbs.db
+
+# Coverage reports
+htmlcov/
+.coverage
+coverage.xml

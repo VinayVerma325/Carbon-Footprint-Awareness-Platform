@@ -1,5 +1,11 @@
 # CarbonWise — Production-Grade Carbon Accounting & Action Platform
 
+[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.137-green.svg)](https://fastapi.tiangolo.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](tests/)
+[![WCAG 2.1 AA](https://img.shields.io/badge/accessibility-WCAG%202.1%20AA-blueviolet.svg)](https://www.w3.org/WAI/WCAG21/quickref/)
+
 CarbonWise is a production-grade, secure, and highly accessible web application designed to help individuals understand, track, and offset their carbon footprint. By integrating **Google Routes API v2** for precise travel calculations and **Google Cloud Firestore** for user tracking logs, CarbonWise provides tailored, actionable recommendations for lowering emissions and tracking net carbon footprints in compliance with modern environmental standards.
 
 ---
@@ -44,6 +50,11 @@ To achieve maximum security compliance, CarbonWise implements:
     - `X-Content-Type-Options: nosniff` (prevents MIME sniffing)
     - `X-XSS-Protection: 1; mode=block` (legacy XSS block)
     - `Referrer-Policy: strict-origin-when-cross-origin` (protects referrer details)
+    - `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()` (restricts browser feature access)
+    - `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload` (enforces HTTPS)
+7.  **Custom Exception Hierarchy**: Structured domain-specific exceptions (`ValidationError`, `CalculationError`, `ExternalServiceError`, etc.) with machine-readable error codes and HTTP status mapping, replacing unstructured `ValueError`/`Exception` raises.
+8.  **Input Sanitization Layer**: Centralized `sanitizer.py` module strips control characters, zero-width Unicode, normalizes identifiers, and clamps numeric ranges to prevent log-injection and invisible-character attacks.
+9.  **Global Exception Handler**: FastAPI exception handler returns structured JSON error responses (`{ "error": "VALIDATION_ERROR", "detail": "..." }`) for all domain exceptions.
 
 ---
 
@@ -83,13 +94,76 @@ graph TD
 ```
 
 ### Components Layout
-- **[main.py](file:///c:/VINAY/ALL%20PROJECT/Carbon%20Footprint%20Awareness%20Platform/main.py)**: REST API Controllers, Security Middleware, Pydantic Schema validations.
-- **[config.py](file:///c:/VINAY/ALL%20PROJECT/Carbon%20Footprint%20Awareness%20Platform/config.py)**: Environment configuration loader.
-- **[core/calculator.py](file:///c:/VINAY/ALL%20PROJECT/Carbon%20Footprint%20Awareness%20Platform/core/calculator.py)**: Server-side emission equations and insight parser.
-- **[services/google_services.py](file:///c:/VINAY/ALL%20PROJECT/Carbon%20Footprint%20Awareness%20Platform/services/google_services.py)**: Waypoint routing client and Firebase adapter.
-- **[index.html](file:///c:/VINAY/ALL%20PROJECT/Carbon%20Footprint%20Awareness%20Platform/index.html)**: Pure semantic HTML5 layout with accessibility tags.
-- **[app.js](file:///c:/VINAY/ALL%20PROJECT/Carbon%20Footprint%20Awareness%20Platform/app.js)**: Safe JS DOM renderer and visual controls controller.
-- **[style.css](file:///c:/VINAY/ALL%20PROJECT/Carbon%20Footprint%20Awareness%20Platform/style.css)**: Glassmorphic theme styling sheet.
+- **[main.py](main.py)**: REST API Controllers, Security Middleware, Pydantic Schema validations, Global Exception Handlers.
+- **[config.py](config.py)**: Environment configuration loader with validation.
+- **[exceptions.py](exceptions.py)**: Custom exception hierarchy (`CarbonWiseError` → `ValidationError`, `CalculationError`, `ExternalServiceError`, `DatabaseError`, `ResourceNotFoundError`).
+- **[sanitizer.py](sanitizer.py)**: Input sanitization, text cleaning, numeric clamping, and mode normalization utilities.
+- **[core/calculator.py](core/calculator.py)**: Server-side emission equations and insight parser.
+- **[services/google_services.py](services/google_services.py)**: Waypoint routing client and Firebase adapter with graceful fallback.
+- **[index.html](index.html)**: Pure semantic HTML5 layout with accessibility tags.
+- **[app.js](app.js)**: Safe JS DOM renderer and visual controls controller.
+- **[style.css](style.css)**: Glassmorphic theme styling sheet.
+
+---
+
+## 📡 API Reference
+
+All endpoints are served at `http://localhost:8000` by default.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/health` | Platform health status and service configuration summary |
+| `POST` | `/api/route` | Estimate distance/duration between two addresses via Google Routes |
+| `POST` | `/api/calculate` | Calculate carbon footprint from user metrics and persist to database |
+| `POST` | `/api/action` | Log a green offset action (public transit, meatless meal, etc.) |
+| `GET` | `/api/action?user_id=` | Retrieve green action history for a user |
+| `GET` | `/api/logs?user_id=` | Retrieve calculation history with dynamically computed `net_co2` |
+| `DELETE` | `/api/logs?user_id=` | Clear all calculation history and actions for a user |
+| `GET` | `/api/recommendations?user_id=` | Generate personalized carbon-saving recommendations |
+
+### Example Request — Calculate Footprint
+
+```bash
+curl -X POST http://localhost:8000/api/calculate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "demo_user",
+    "electricity_kwh": 10.0,
+    "gas_m3": 2.0,
+    "transport": [{"distance": 15.0, "mode": "car", "vehicle_type": "hybrid"}],
+    "diet_type": "vegetarian",
+    "diet_days": 1,
+    "waste_kg": 2.0,
+    "waste_recycling_rate": 0.5
+  }'
+```
+
+### Example Response
+
+```json
+{
+  "status": "success",
+  "calculations": {
+    "electricity_co2": 3.85,
+    "gas_co2": 4.06,
+    "transport_co2": 3.0,
+    "diet_co2": 4.7,
+    "waste_co2": 0.55,
+    "total_co2": 16.16,
+    "net_co2": 16.16
+  }
+}
+```
+
+### Error Response Format
+
+All errors are returned as structured JSON:
+```json
+{
+  "error": "VALIDATION_ERROR",
+  "detail": "Electricity usage cannot be negative."
+}
+```
 
 ---
 
@@ -124,14 +198,55 @@ Visit the platform at `http://localhost:8000`.
 ### 4. Execute Automated Test Suite
 To verify computations, security headers, CORS restrictions, and API schemas:
 ```bash
-python -m unittest tests/test_platform.py
+python -m pytest tests/ -v
+```
+
+---
+
+## 🚢 Deployment
+
+### Render / Railway (Cloud PaaS)
+
+1. Push the repository to GitHub.
+2. Connect the repo in your cloud platform dashboard.
+3. Set the following environment variables:
+   - `GOOGLE_MAPS_API_KEY` — your Google Routes API key
+   - `FIREBASE_PROJECT_ID` — your Firestore project ID
+   - `FIREBASE_CREDENTIALS_JSON` — your service account JSON (inline)
+   - `ALLOWED_ORIGINS` — your deployed domain (e.g. `https://carbonwise.onrender.com`)
+4. Set the start command:
+   ```bash
+   uvicorn main:app --host 0.0.0.0 --port $PORT
+   ```
+5. The platform will automatically detect the environment and configure itself.
+
+### Docker
+
+```dockerfile
+FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 ---
 
 ## 🔮 Future Scope & Roadmap
 
-1.  **Localized Smart Grid Integration**: Read electricity meters via smart-home API tokens to compute emissions based on live grid grid intensity (coal vs solar mix).
+1.  **Localized Smart Grid Integration**: Read electricity meters via smart-home API tokens to compute emissions based on live grid intensity (coal vs solar mix).
 2.  **Machine Learning Recommendation Engine**: Employ time-series prediction models to proactively suggest action prompts (e.g. predicting higher vehicle usage on cold days).
 3.  **Social Leaderboards & Badging**: Dynamic multi-user challenges with gamified carbon badges to drive peer-to-peer climate engagement.
-4.  **Verified Carbon Credit Marketplace**: Allow users to purchase verified carbon offset offsets (trees planted, methane capture) directly within the dashboard using Stripe.
+4.  **Verified Carbon Credit Marketplace**: Allow users to purchase verified carbon offsets (trees planted, methane capture) directly within the dashboard using Stripe.
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
+
+## 🤝 Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to contribute.

@@ -1,1 +1,1 @@
-# Tests module package initializer
+"""Test suite package for the CarbonWise platform."""
